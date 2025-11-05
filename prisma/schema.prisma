@@ -82,9 +82,79 @@ model User {
   roles                Role[]
   role_users           RoleUser[]
   payment_transactions PaymentTransaction[]
+  UserPreferences      UserPreferences[]
 
   @@map("users")
 }
+///////////////////////////////
+//////// User Preferences /////
+///////////////////////////////
+enum Focus_Area {
+  Mental_Body
+  Emotional_Body
+  Physical_Body
+  Energy_Body
+}
+enum Weekly_Practice {
+  Light_1_3
+  Moderate_4_7
+  Deep_4_7
+}
+enum Frequency {
+  DAILY
+  WEEKLY
+  OCCASIONALLY
+}
+enum Content_Preference {
+  DAILY_WISDOM_QUOTES
+  GUIDED_EXERCISES
+  MEDITATION_CONTENT
+  COMMUNITY_DISCUSSIONS
+  JOURNAL_PROMPTS
+  SCIENTIFIC_INSIGHTS
+}
+model UserPreferences {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  user_id            String?
+  user               User?                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  content_preference Content_Preference[]
+
+  dailyWisdomQuotes    Frequency
+  guidedExercises      Frequency
+  meditationContent    Frequency
+  communityDiscussions Frequency
+  journalPrompts       Frequency
+  scientificInsights   Frequency
+  focus_area           Focus_Area?
+  weekly_practice      Weekly_Practice?
+
+  @@map("user_preferences")
+}
+
+
+////////////////////////////////
+//////// Plans /////////////////
+////////////////////////////////
+model Plans{
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  title       String?
+  description String?
+  price       String?
+  subtitle    String?
+  tag         String?
+  features    String[]
+
+  @@map("plans")
+}
+
 
 model Ucode {
   id         String   @id @default(cuid())
@@ -434,3 +504,23 @@ model UserSetting {
 //   tenant    Organization? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 //   @@map("posts")
 // }
+
+///////////////////////////////////////
+//////// model Content ////////////////
+///////////////////////////////////////
+
+model Content {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  status  Int?    @default(1) @db.SmallInt
+  title   String?
+  body    String? @db.Text
+  slug    String? @unique
+  excerpt String? @db.Text
+  author  String?
+
+  @@map("contents")
+}
