@@ -28,7 +28,7 @@ import { AuthGuard } from '@nestjs/passport';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   @ApiOperation({ summary: 'Get user details' })
   @ApiBearerAuth()
@@ -102,6 +102,19 @@ export class AuthController {
         success: false,
         message: error.message,
       };
+    }
+  }
+
+  //update user preff
+
+  @UseGuards(JwtAuthGuard)
+  @Post('userPreff')
+  async updateUserPreff(@Req() req: Request, @Body() body: any) {
+    try {
+      const preffId = req.user.userPrefId;
+      return this.authService.updateUserPreferences(preffId, body);
+    } catch (error) {
+
     }
   }
 

@@ -16,6 +16,7 @@ import { DateHelper } from '../../common/helper/date.helper';
 import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
+import { date } from 'zod';
 
 @Injectable()
 export class AuthService {
@@ -401,18 +402,17 @@ export class AuthService {
       });
 
       //creating jwt token
-      const userId = user.data.id;
-      const userPrefID = userPreferences.id;
-      const payload = { userPrefId: userPrefID, sub: userId };
-      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
 
+      const payload = { userPrefId: userPreferences.id, sub: user.data.id, email: user.data.email };
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
       // store accessToken as refresh token in redis
       await this.redis.set(
         `refresh_token:${user.data.id}`,
-        accessToken,
+        refreshToken,
         'EX',
-        60 * 60, // 1 hour in seconds
+        60 * 60 * 24 * 7, // 1 hour in seconds
       );
       // ----------------------------------------------------
       // // create otp code
@@ -451,7 +451,10 @@ export class AuthService {
       return {
         success: true,
         message: 'Account created successfully',
-        token: accessToken
+        data: {
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        }
       };
     } catch (error) {
       return {
@@ -463,9 +466,66 @@ export class AuthService {
 
   async updateUserPreferences(userPrefId: string, updateUserPreferencesDto: UserPreferencesDto) {
     try {
-      console.log('Updating preferences for userId:', userPrefId);
 
-      const userPreferences = await this.prisma.userPreferences.update({
+      // chcking the id 
+      if (!userPrefId) {
+        return {
+          success: false,
+          message: 'id is missing',
+        };
+      }
+      const requiredFields = [
+        'content_preference',
+        'dailyWisdomQuotes',
+        'guidedExercises',
+        'meditationContent',
+        'communityDiscussions',
+        'journalPrompts',
+        'scientificInsights',
+        'focus_area',
+        'weekly_practice',
+      ];
+      const checkUserPref = await this.prisma.userPreferences.findUnique({
+        where: { id: userPrefId },
+        select: {
+          id: true,
+          content_preference: true,
+          dailyWisdomQuotes: true,
+          guidedExercises: true,
+          meditationContent: true,
+          communityDiscussions: true,
+          journalPrompts: true,
+          scientificInsights: true,
+          focus_area: true,
+          weekly_practice: true,
+        }
+      });
+      // if already has data
+      if (checkUserPref.communityDiscussions && checkUserPref.content_preference) {
+        return {
+          success: false,
+          message: 'User preferences already set',
+        }
+      }
+      if (!checkUserPref) {
+        return {
+          success: false,
+          message: 'User preferences not found',
+        };
+      }
+      const importantFields = requiredFields.filter(
+        (field) =>
+          updateUserPreferencesDto[field as keyof UserPreferencesDto] === undefined ||
+          updateUserPreferencesDto[field as keyof UserPreferencesDto] === null
+      );
+      if (importantFields.length > 0) {
+        return {
+          success: false,
+          message: `Missing required data`,
+        };
+      }
+      // update user preferences
+      await this.prisma.userPreferences.update({
         where: { id: userPrefId },
         data: {
           content_preference: updateUserPreferencesDto.content_preference,
@@ -477,14 +537,13 @@ export class AuthService {
           scientificInsights: updateUserPreferencesDto.scientificInsights,
           focus_area: updateUserPreferencesDto.focus_area,
           weekly_practice: updateUserPreferencesDto.weekly_practice,
-        }
-
+        },
       });
 
       return {
         success: true,
         message: 'User preferences updated successfully',
-        data: userPreferences,
+
       };
     } catch (error: any) {
       console.error('Error updating user preferences:', error);
@@ -495,6 +554,7 @@ export class AuthService {
       };
     }
   }
+
 
 
   async forgotPassword(email) {
