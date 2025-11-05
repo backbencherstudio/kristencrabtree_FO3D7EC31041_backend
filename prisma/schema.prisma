@@ -65,8 +65,9 @@ model User {
   type              String?   @default("user")
   email_verified_at DateTime?
 
-  is_two_factor_enabled Int?    @default(0)
-  two_factor_secret     String? // secret key for two factor authentication
+  is_agrred_to_terms_and_policy Boolean?
+  is_two_factor_enabled         Int?    @default(0)
+  two_factor_secret             String? // secret key for two factor authentication
 
   accounts                  Account[]
   creator_conversations     Conversation[] @relation("creator")
@@ -86,6 +87,7 @@ model User {
 
   @@map("users")
 }
+
 ///////////////////////////////
 //////// User Preferences /////
 ///////////////////////////////
@@ -95,16 +97,19 @@ enum Focus_Area {
   Physical_Body
   Energy_Body
 }
+
 enum Weekly_Practice {
   Light_1_3
   Moderate_4_7
   Deep_4_7
 }
+
 enum Frequency {
   DAILY
   WEEKLY
   OCCASIONALLY
 }
+
 enum Content_Preference {
   DAILY_WISDOM_QUOTES
   GUIDED_EXERCISES
@@ -113,6 +118,7 @@ enum Content_Preference {
   JOURNAL_PROMPTS
   SCIENTIFIC_INSIGHTS
 }
+
 model UserPreferences {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -123,23 +129,22 @@ model UserPreferences {
   user               User?                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   content_preference Content_Preference[]
 
-  dailyWisdomQuotes    Frequency
-  guidedExercises      Frequency
-  meditationContent    Frequency
-  communityDiscussions Frequency
-  journalPrompts       Frequency
-  scientificInsights   Frequency
+  dailyWisdomQuotes    Frequency?
+  guidedExercises      Frequency?
+  meditationContent    Frequency?
+  communityDiscussions Frequency?
+  journalPrompts       Frequency?
+  scientificInsights   Frequency?
   focus_area           Focus_Area?
   weekly_practice      Weekly_Practice?
 
   @@map("user_preferences")
 }
 
-
 ////////////////////////////////
 //////// Plans /////////////////
 ////////////////////////////////
-model Plans{
+model Plans {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now())
@@ -154,7 +159,6 @@ model Plans{
 
   @@map("plans")
 }
-
 
 model Ucode {
   id         String   @id @default(cuid())

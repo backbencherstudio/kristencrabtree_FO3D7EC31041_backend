@@ -196,6 +196,7 @@ export class UserRepository {
     email,
     password,
     phone_number,
+    is_agrred_to_terms_and_policy,
     role_id = null,
     type = 'user',
   }: {
@@ -207,6 +208,7 @@ export class UserRepository {
     phone_number?: string;
     role_id?: string;
     type?: string;
+    is_agrred_to_terms_and_policy?: boolean;
   }) {
     try {
       const data = {};
@@ -243,6 +245,10 @@ export class UserRepository {
           password,
           appConfig().security.salt,
         );
+      }
+
+      if (is_agrred_to_terms_and_policy !== undefined) {
+        data['is_agrred_to_terms_and_policy'] = is_agrred_to_terms_and_policy;
       }
 
       if (type && ArrayHelper.inArray(type, Object.values(Role))) {

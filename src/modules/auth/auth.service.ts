@@ -15,6 +15,7 @@ import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../common/helper/date.helper';
 import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
+import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 
 @Injectable()
 export class AuthService {
@@ -23,7 +24,7 @@ export class AuthService {
     private prisma: PrismaService,
     private mailService: MailService,
     @InjectRedis() private readonly redis: Redis,
-  ) {}
+  ) { }
 
   async me(userId: string) {
     try {
@@ -332,6 +333,7 @@ export class AuthService {
     email,
     password,
     type,
+    is_agrred_to_terms_and_policy,
   }: {
     name: string;
     first_name: string;
@@ -339,6 +341,7 @@ export class AuthService {
     email: string;
     password: string;
     type?: string;
+    is_agrred_to_terms_and_policy: boolean;
   }) {
     try {
       // Check if email already exist
@@ -355,12 +358,13 @@ export class AuthService {
       }
 
       const user = await UserRepository.createUser({
-        name: name,
+        name: first_name + ' ' + last_name,
         first_name: first_name,
         last_name: last_name,
         email: email,
         password: password,
         type: type,
+        is_agrred_to_terms_and_policy: is_agrred_to_terms_and_policy,
       });
 
       if (user == null && user.success == false) {
@@ -388,6 +392,28 @@ export class AuthService {
         });
       }
 
+      const userPreferences = await this.prisma.userPreferences.create({
+        data: {
+          user: {
+            connect: { id: user.data.id },
+          },
+        },
+      });
+
+      //creating jwt token
+      const userId = user.data.id;
+      const userPrefID = userPreferences.id;
+      const payload = { userPrefId: userPrefID, sub: userId };
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+
+
+      // store accessToken as refresh token in redis
+      await this.redis.set(
+        `refresh_token:${user.data.id}`,
+        accessToken,
+        'EX',
+        60 * 60, // 1 hour in seconds
+      );
       // ----------------------------------------------------
       // // create otp code
       // const token = await UcodeRepository.createToken({
@@ -410,22 +436,22 @@ export class AuthService {
       // ----------------------------------------------------
 
       // Generate verification token
-      const token = await UcodeRepository.createVerificationToken({
-        userId: user.data.id,
-        email: email,
-      });
+      // const token = await UcodeRepository.createVerificationToken({
+      //   userId: user.data.id,
+      //   email: email,
+      // });
 
       // Send verification email with token
-      await this.mailService.sendVerificationLink({
-        email,
-        name: email,
-        token: token.token,
-        type: type,
-      });
-
+      // await this.mailService.sendVerificationLink({
+      //   email,
+      //   name: email,
+      //   token: token.token,
+      //   type: type,
+      // });
       return {
         success: true,
-        message: 'We have sent a verification link to your email',
+        message: 'Account created successfully',
+        token: accessToken
       };
     } catch (error) {
       return {
@@ -434,6 +460,42 @@ export class AuthService {
       };
     }
   }
+
+  async updateUserPreferences(userPrefId: string, updateUserPreferencesDto: UserPreferencesDto) {
+    try {
+      console.log('Updating preferences for userId:', userPrefId);
+
+      const userPreferences = await this.prisma.userPreferences.update({
+        where: { id: userPrefId },
+        data: {
+          content_preference: updateUserPreferencesDto.content_preference,
+          dailyWisdomQuotes: updateUserPreferencesDto.dailyWisdomQuotes,
+          guidedExercises: updateUserPreferencesDto.guidedExercises,
+          meditationContent: updateUserPreferencesDto.meditationContent,
+          communityDiscussions: updateUserPreferencesDto.communityDiscussions,
+          journalPrompts: updateUserPreferencesDto.journalPrompts,
+          scientificInsights: updateUserPreferencesDto.scientificInsights,
+          focus_area: updateUserPreferencesDto.focus_area,
+          weekly_practice: updateUserPreferencesDto.weekly_practice,
+        }
+
+      });
+
+      return {
+        success: true,
+        message: 'User preferences updated successfully',
+        data: userPreferences,
+      };
+    } catch (error: any) {
+      console.error('Error updating user preferences:', error);
+      return {
+        success: false,
+        message: 'Failed to update user preferences',
+        error: error.message,
+      };
+    }
+  }
+
 
   async forgotPassword(email) {
     try {

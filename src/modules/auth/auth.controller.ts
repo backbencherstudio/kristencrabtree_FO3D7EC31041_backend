@@ -53,16 +53,17 @@ export class AuthController {
   @Post('register')
   async create(@Body() data: CreateUserDto) {
     try {
-      const name = data.name;
+      //const name = data.name;
       const first_name = data.first_name;
       const last_name = data.last_name;
       const email = data.email;
       const password = data.password;
       const type = data.type;
+      const is_agrred_to_terms_and_policy = data.is_agrred_to_terms_and_policy;
 
-      if (!name) {
-        throw new HttpException('Name not provided', HttpStatus.UNAUTHORIZED);
-      }
+      // if (!name) {
+      //   throw new HttpException('Name not provided', HttpStatus.UNAUTHORIZED);
+      // }
       if (!first_name) {
         throw new HttpException(
           'First name not provided',
@@ -86,12 +87,13 @@ export class AuthController {
       }
 
       const response = await this.authService.register({
-        name: name,
+        name: first_name + ' ' + last_name,
         first_name: first_name,
         last_name: last_name,
         email: email,
         password: password,
         type: type,
+        is_agrred_to_terms_and_policy: is_agrred_to_terms_and_policy,
       });
 
       return response;
