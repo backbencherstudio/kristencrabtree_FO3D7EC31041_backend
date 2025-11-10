@@ -20,6 +20,7 @@ import { MailService } from '../../mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
+import { date } from 'zod';
 
 @Injectable()
 export class AuthService {
@@ -604,43 +605,6 @@ export class AuthService {
     }
   }
 
-  async verifyOTP(email: string, otp: string) {
-    try {
-      const otpRecord = await this.prisma.ucode.findFirst({
-        where: { email },
-        orderBy: {
-          created_at: 'desc',
-        },
-      });
-
-      if (!otpRecord) {
-        throw new BadRequestException('No OTP found for this email');
-      }
-
-      if (otpRecord.expired_at < new Date()) {
-        throw new BadRequestException('OTP expired');
-      }
-
-      if (otpRecord.token !== otp) {
-        throw new BadRequestException('Invalid OTP');
-      }
-
-      await this.prisma.ucode.delete({
-        where: { id: otpRecord.id },
-      });
-
-      return {
-        success: true,
-        message: 'OTP is verified successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
   async requestNewOTP(email: string) {
     try {
       const user = await UserRepository.exist({
@@ -685,24 +649,23 @@ export class AuthService {
     }
   }
 
-  async resetPassword({ email, token, password }) {
+  async forgotPasswordOtpVerify({ email, token }) {
+
     try {
       const user = await UserRepository.exist({
         field: 'email',
         value: email,
       });
-
       if (user) {
         const existToken = await UcodeRepository.validateToken({
           email: email,
           token: token,
         });
-
         if (existToken) {
-          await UserRepository.changePassword({
-            email: email,
-            password: password,
-          });
+
+          //create a jwt token for password reset
+          const payload = { email: email, sub: user.id };
+          const resetToken = this.jwtService.sign(payload, { expiresIn: '15m' });
 
           // delete otp code
           await UcodeRepository.deleteToken({
@@ -712,7 +675,8 @@ export class AuthService {
 
           return {
             success: true,
-            message: 'Password updated successfully',
+            message: 'Otp verified successfully',
+            token: resetToken,
           };
         } else {
           return {
@@ -726,6 +690,34 @@ export class AuthService {
           message: 'Email not found',
         };
       }
+    } catch (error) {
+
+    }
+
+  }
+
+  async resetPassword({ email, token, password }) {
+    try {
+      
+      const user = await UserRepository.exist({
+        field: 'email',
+        value: email,
+      });
+
+      if (user) {
+        try {
+          const data = await UserRepository.changePassword({
+            email: email,
+            password: password,
+          });
+          return {
+            data
+          };
+        } catch (error) {
+
+        }
+      }
+
     } catch (error) {
       return {
         success: false,
