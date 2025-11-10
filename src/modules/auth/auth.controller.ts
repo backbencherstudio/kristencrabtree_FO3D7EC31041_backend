@@ -60,6 +60,13 @@ export class AuthController {
       const type = data.type;
       const is_agrred_to_terms_and_policy = data.is_agrred_to_terms_and_policy;
 
+      if(is_agrred_to_terms_and_policy == false){
+        throw new HttpException(
+          'You must agree to the terms and policy',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
       // if (!name) {
       //   throw new HttpException('Name not provided', HttpStatus.UNAUTHORIZED);
       // }
@@ -259,19 +266,7 @@ export class AuthController {
     }
   }
 
-  @ApiOperation({ summary: 'Verify OTP' })
-  @Post('verify-otp')
-  async verifyOTP(@Body() data: { email: string; otp: string }) {
-    try {
-      const response = await this.authService.verifyOTP(data.email, data.otp);
-      return response;
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Something went wrong',
-      };
-    }
-  }
+
 
   @ApiOperation({ summary: 'Request new OTP' })
   @Post('request-new-otp')
@@ -287,6 +282,16 @@ export class AuthController {
     }
   }
 
+  @Post('forgetPasswordOtpVerify')
+  async forgetPasswordOtpVerify(@Body() data: { email: string; token: string }) {
+    try {
+      const email = data.email;
+      const token = data.token;
+      return await this.authService.forgotPasswordOtpVerify({email, token});
+    } catch (error) {
+      
+    }
+  }
   // verify email to verify the email
   @ApiOperation({ summary: 'Verify email' })
   @Post('verify-email')
@@ -331,15 +336,18 @@ export class AuthController {
   }
 
   // reset password if user forget the password
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Reset password' })
   @Post('reset-password')
   async resetPassword(
-    @Body() data: { email: string; token: string; password: string },
+    @Req() req: Request,
+    @Body() data: { password: string },
   ) {
     try {
-      const email = data.email;
-      const token = data.token;
+      const email = req.user.email;
+      const token = req.user.userId;
       const password = data.password;
+
       if (!email) {
         throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
       }
