@@ -12,23 +12,22 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
-import { LocalAuthGuard } from './guards/local-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import appConfig from '../../config/app.config';
-import { AuthGuard } from '@nestjs/passport';
+import { LocalAuthGuard } from './guards/local-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService) {}
 
   @ApiOperation({ summary: 'Get user details' })
   @ApiBearerAuth()
@@ -113,9 +112,7 @@ export class AuthController {
     try {
       const preffId = req.user.userPrefId;
       return this.authService.updateUserPreferences(preffId, body);
-    } catch (error) {
-
-    }
+    } catch (error) {}
   }
 
   // login user
@@ -254,6 +251,34 @@ export class AuthController {
         throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
       }
       return await this.authService.forgotPassword(email);
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Something went wrong',
+      };
+    }
+  }
+
+  @ApiOperation({ summary: 'Verify OTP' })
+  @Post('verify-otp')
+  async verifyOTP(@Body() data: { email: string; otp: string }) {
+    try {
+      const response = await this.authService.verifyOTP(data.email, data.otp);
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Something went wrong',
+      };
+    }
+  }
+
+  @ApiOperation({ summary: 'Request new OTP' })
+  @Post('request-new-otp')
+  async requestNewOTP(@Body() data: { email: string }) {
+    try {
+      const response = await this.authService.requestNewOTP(data.email);
+      return response;
     } catch (error) {
       return {
         success: false,

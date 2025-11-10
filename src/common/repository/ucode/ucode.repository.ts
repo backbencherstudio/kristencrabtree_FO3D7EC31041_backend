@@ -1,7 +1,7 @@
+import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import { randomInt } from 'crypto';
 import { v4 as uuid } from 'uuid';
-import { PrismaClient } from '@prisma/client';
 import { DateHelper } from '../../helper/date.helper';
 import { UserRepository } from '../user/user.repository';
 

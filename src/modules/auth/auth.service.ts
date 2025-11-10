@@ -1,22 +1,25 @@
 // external imports
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { InjectRedis } from '@nestjs-modules/ioredis';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import Redis from 'ioredis';
 
 //internal imports
-import appConfig from '../../config/app.config';
-import { PrismaService } from '../../prisma/prisma.service';
-import { UserRepository } from '../../common/repository/user/user.repository';
-import { MailService } from '../../mail/mail.service';
-import { UcodeRepository } from '../../common/repository/ucode/ucode.repository';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../common/helper/date.helper';
-import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
+import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
+import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
+import { UcodeRepository } from '../../common/repository/ucode/ucode.repository';
+import { UserRepository } from '../../common/repository/user/user.repository';
+import appConfig from '../../config/app.config';
+import { MailService } from '../../mail/mail.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
-import { date } from 'zod';
 
 @Injectable()
 export class AuthService {
@@ -25,7 +28,7 @@ export class AuthService {
     private prisma: PrismaService,
     private mailService: MailService,
     @InjectRedis() private readonly redis: Redis,
-  ) { }
+  ) {}
 
   async me(userId: string) {
     try {
@@ -403,7 +406,11 @@ export class AuthService {
 
       //creating jwt token
 
-      const payload = { userPrefId: userPreferences.id, sub: user.data.id, email: user.data.email };
+      const payload = {
+        userPrefId: userPreferences.id,
+        sub: user.data.id,
+        email: user.data.email,
+      };
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
@@ -454,7 +461,7 @@ export class AuthService {
         data: {
           accessToken: accessToken,
           refreshToken: refreshToken,
-        }
+        },
       };
     } catch (error) {
       return {
@@ -464,10 +471,12 @@ export class AuthService {
     }
   }
 
-  async updateUserPreferences(userPrefId: string, updateUserPreferencesDto: UserPreferencesDto) {
+  async updateUserPreferences(
+    userPrefId: string,
+    updateUserPreferencesDto: UserPreferencesDto,
+  ) {
     try {
-
-      // chcking the id 
+      // chcking the id
       if (!userPrefId) {
         return {
           success: false,
@@ -498,14 +507,17 @@ export class AuthService {
           scientificInsights: true,
           focus_area: true,
           weekly_practice: true,
-        }
+        },
       });
       // if already has data
-      if (checkUserPref.communityDiscussions && checkUserPref.content_preference) {
+      if (
+        checkUserPref.communityDiscussions &&
+        checkUserPref.content_preference
+      ) {
         return {
           success: false,
           message: 'User preferences already set',
-        }
+        };
       }
       if (!checkUserPref) {
         return {
@@ -515,8 +527,9 @@ export class AuthService {
       }
       const importantFields = requiredFields.filter(
         (field) =>
-          updateUserPreferencesDto[field as keyof UserPreferencesDto] === undefined ||
-          updateUserPreferencesDto[field as keyof UserPreferencesDto] === null
+          updateUserPreferencesDto[field as keyof UserPreferencesDto] ===
+            undefined ||
+          updateUserPreferencesDto[field as keyof UserPreferencesDto] === null,
       );
       if (importantFields.length > 0) {
         return {
@@ -543,7 +556,6 @@ export class AuthService {
       return {
         success: true,
         message: 'User preferences updated successfully',
-
       };
     } catch (error: any) {
       console.error('Error updating user preferences:', error);
@@ -555,13 +567,92 @@ export class AuthService {
     }
   }
 
-
-
-  async forgotPassword(email) {
+  async forgotPassword(email: string) {
     try {
       const user = await UserRepository.exist({
         field: 'email',
         value: email,
+      });
+
+      if (user) {
+        const token = await UcodeRepository.createToken({
+          userId: user.id,
+          isOtp: true,
+        });
+
+        await this.mailService.sendOtpCodeToEmail({
+          email: email,
+          name: user.name,
+          otp: token,
+        });
+
+        return {
+          success: true,
+          message: 'We have sent an OTP code to your email',
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Email not found',
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  async verifyOTP(email: string, otp: string) {
+    try {
+      const otpRecord = await this.prisma.ucode.findFirst({
+        where: { email },
+        orderBy: {
+          created_at: 'desc',
+        },
+      });
+
+      if (!otpRecord) {
+        throw new BadRequestException('No OTP found for this email');
+      }
+
+      if (otpRecord.expired_at < new Date()) {
+        throw new BadRequestException('OTP expired');
+      }
+
+      if (otpRecord.token !== otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
+
+      await this.prisma.ucode.delete({
+        where: { id: otpRecord.id },
+      });
+
+      return {
+        success: true,
+        message: 'OTP is verified successfully',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  async requestNewOTP(email: string) {
+    try {
+      const user = await UserRepository.exist({
+        field: 'email',
+        value: email,
+      });
+
+      // Delete old OTP (if any)
+      await this.prisma.ucode.deleteMany({
+        where: {
+          email,
+        },
       });
 
       if (user) {

@@ -2,22 +2,22 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 // import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 // import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
-import { BullModule } from '@nestjs/bullmq';
 import { RedisModule } from '@nestjs-modules/ioredis';
+import { BullModule } from '@nestjs/bullmq';
+import { ConfigModule } from '@nestjs/config';
 
 // internal imports
-import appConfig from './config/app.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import appConfig from './config/app.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 // import { ThrottlerBehindProxyGuard } from './common/guard/throttler-behind-proxy.guard';
 import { AbilityModule } from './ability/ability.module';
 import { MailModule } from './mail/mail.module';
-import { ApplicationModule } from './modules/application/application.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ApplicationModule } from './modules/application/application.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PaymentModule } from './modules/payment/payment.module';
 

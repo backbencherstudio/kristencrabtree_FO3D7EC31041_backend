@@ -1,9 +1,11 @@
-import stripe from 'stripe';
 import * as fs from 'fs';
+import stripe from 'stripe';
 import appConfig from '../../../../config/app.config';
 import { Fetch } from '../../Fetch';
 
-const STRIPE_SECRET_KEY = appConfig().payment.stripe.secret_key;
+const STRIPE_SECRET_KEY =
+  appConfig().payment.stripe.secret_key ||
+  'sk_test_51RDjzqQLn2109uZQB7vqUTHcXVJd2Nd9gDh227XiOgRq9nZrgcx5bHqVes2TR1DrzkOVYTDHrHhijmd87W5kCvXC00srYXkc6V';
 
 const Stripe = new stripe(STRIPE_SECRET_KEY, {
   apiVersion: '2025-03-31.basil',
