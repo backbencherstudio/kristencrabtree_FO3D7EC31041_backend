@@ -21,6 +21,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 import { date } from 'zod';
+import { User } from '../admin/user/entities/user.entity';
 
 @Injectable()
 export class AuthService {

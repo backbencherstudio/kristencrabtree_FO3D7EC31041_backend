@@ -266,22 +266,6 @@ export class AuthController {
     }
   }
 
-
-
-  @ApiOperation({ summary: 'Request new OTP' })
-  @Post('request-new-otp')
-  async requestNewOTP(@Body() data: { email: string }) {
-    try {
-      const response = await this.authService.requestNewOTP(data.email);
-      return response;
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Something went wrong',
-      };
-    }
-  }
-
   @Post('forgetPasswordOtpVerify')
   async forgetPasswordOtpVerify(@Body() data: { email: string; token: string }) {
     try {

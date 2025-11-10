@@ -446,16 +446,48 @@ export class UserRepository {
     password: string;
   }) {
     try {
-      password = await bcrypt.hash(password, appConfig().security.salt);
-      const user = await prisma.user.update({
+      const oldPassword = await prisma.user.findFirst({
         where: {
           email: email,
         },
-        data: {
-          password: password,
-        },
+        select: {
+          password: true
+        }
       });
-      return user;
+      //bycrypting the old password to compare
+      const pass = await bcrypt.compare(password, oldPassword.password);
+
+
+      //checking old password 
+      if (pass === true) {
+        return {
+          success: false,
+          message: 'New password cannot be same as old password'
+        }
+      }
+      if (password.length < 6) {
+        return{
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        }
+      }
+      else {
+        password = await bcrypt.hash(password, appConfig().security.salt);
+        const user = await prisma.user.update({
+          where: {
+            email: email,
+          },
+          data: {
+            password: password,
+          },
+        });
+        return {
+          success: true,
+          message: 'Password changed successfully',
+        };
+      }
+
+
     } catch (error) {
       throw error;
     }
