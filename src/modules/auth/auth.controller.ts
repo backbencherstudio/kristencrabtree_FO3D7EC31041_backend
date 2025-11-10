@@ -266,11 +266,13 @@ export class AuthController {
     }
   }
 
+
   @Post('forgetPasswordOtpVerify')
   async forgetPasswordOtpVerify(@Body() data: { email: string; token: string }) {
     try {
       const email = data.email;
       const token = data.token;
+      
       return await this.authService.forgotPasswordOtpVerify({email, token});
     } catch (error) {
       

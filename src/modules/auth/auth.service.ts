@@ -30,7 +30,7 @@ export class AuthService {
     private prisma: PrismaService,
     private mailService: MailService,
     @InjectRedis() private readonly redis: Redis,
-  ) {}
+  ) { }
 
   async me(userId: string) {
     try {
@@ -530,7 +530,7 @@ export class AuthService {
       const importantFields = requiredFields.filter(
         (field) =>
           updateUserPreferencesDto[field as keyof UserPreferencesDto] ===
-            undefined ||
+          undefined ||
           updateUserPreferencesDto[field as keyof UserPreferencesDto] === null,
       );
       if (importantFields.length > 0) {
@@ -666,7 +666,8 @@ export class AuthService {
 
           //create a jwt token for password reset
           const payload = { email: email, sub: user.id };
-          const resetToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+          const resetToken = this.jwtService.sign(payload, { secret: process.env.FORGET_PASS_JWT_SECRET, expiresIn: '15m' });
+          
 
           // delete otp code
           await UcodeRepository.deleteToken({
@@ -699,7 +700,7 @@ export class AuthService {
 
   async resetPassword({ email, token, password }) {
     try {
-      
+
       const user = await UserRepository.exist({
         field: 'email',
         value: email,

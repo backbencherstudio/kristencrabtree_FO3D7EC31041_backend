@@ -43,6 +43,7 @@ export default () => ({
 
   jwt: {
     secret: process.env.JWT_SECRET,
+    secret2: process.env.FORGET_PASS_JWT_SECRET,
     expiry: process.env.JWT_EXPIRY,
   },
 
