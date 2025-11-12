@@ -21,6 +21,8 @@ import { MailProcessor } from './processors/mail.processor';
           pass: appConfig().mail.password,
         },
       },
+
+      
       defaults: {
         from: appConfig().mail.from,
       },
@@ -35,9 +37,10 @@ import { MailProcessor } from './processors/mail.processor';
       },
     }),
     BullModule.registerQueue({
-      name: 'mail-queue',
+      name: 'mail-queue5',
     }),
   ],
+  
   providers: [MailService, MailProcessor],
   exports: [MailService],
 })

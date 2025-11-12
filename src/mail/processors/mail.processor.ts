@@ -3,7 +3,7 @@ import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 
-@Processor('mail-queue')
+@Processor('mail-queue5')
 export class MailProcessor extends WorkerHost {
   private readonly logger = new Logger(MailProcessor.name);
   constructor(private mailerService: MailerService) {
@@ -37,14 +37,24 @@ export class MailProcessor extends WorkerHost {
           });
           break;
         case 'sendOtpCodeToEmail':
-          this.logger.log('Sending OTP code to email');
-          await this.mailerService.sendMail({
-            to: job.data.to,
-            from: job.data.from,
-            subject: job.data.subject,
-            template: job.data.template,
-            context: job.data.context,
-          });
+          this.logger.log('Sending OTP code to email', job.data.from);
+          console.log('job data', job.data);
+          console.log('Mail Config:', {
+            host: process.env.MAIL_HOST || 'smtp.gmail.com',
+            port: process.env.MAIL_PORT || 587,
+            user: process.env.MAIL_USERNAME,
+            password: process.env.MAIL_PASSWORD,
+            from: process.env.MAIL_FROM_ADDRESS,
+          }),
+
+            await this.mailerService.sendMail({
+              to: job.data.to,
+              from: job.data.from,
+              subject: job.data.subject,
+              template: job.data.template,
+              context: job.data.context,
+            });
+
           break;
         case 'sendVerificationLink':
           this.logger.log('Sending verification link');
