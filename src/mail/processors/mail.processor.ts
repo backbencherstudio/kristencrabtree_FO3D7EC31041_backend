@@ -37,8 +37,7 @@ export class MailProcessor extends WorkerHost {
           });
           break;
         case 'sendOtpCodeToEmail':
-          this.logger.log('Sending OTP code to email', job.data.from);
-          console.log('job data', job.data);
+          this.logger.log('Sending OTP code to email');
           console.log('Mail Config:', {
             host: process.env.MAIL_HOST || 'smtp.gmail.com',
             port: process.env.MAIL_PORT || 587,
