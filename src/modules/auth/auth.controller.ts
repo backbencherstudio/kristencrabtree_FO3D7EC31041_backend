@@ -60,7 +60,7 @@ export class AuthController {
       const type = data.type;
       const is_agrred_to_terms_and_policy = data.is_agrred_to_terms_and_policy;
 
-      if (is_agrred_to_terms_and_policy == false) {
+      if(is_agrred_to_terms_and_policy == false){
         throw new HttpException(
           'You must agree to the terms and policy',
           HttpStatus.UNAUTHORIZED,
@@ -266,38 +266,16 @@ export class AuthController {
     }
   }
 
-  @ApiOperation({ summary: 'Request for new OTP for forget password' })
-  @Post('requestNewOtpForgetPass')
-  async requestNewOtpForgetPass(@Body() data: { email: string }) {
-    try {
-      const email = data.email;
-      if (!email) {
-        throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
-      }
-
-      return await this.authService.requestNewOtpForgetPass(email);
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Something went wrong',
-      };
-    }
-  }
 
   @Post('forgetPasswordOtpVerify')
-  async forgetPasswordOtpVerify(
-    @Body() data: { email: string; token: string },
-  ) {
+  async forgetPasswordOtpVerify(@Body() data: { email: string; token: string }) {
     try {
       const email = data.email;
       const token = data.token;
-
-      return await this.authService.forgotPasswordOtpVerify({ email, token });
+      
+      return await this.authService.forgotPasswordOtpVerify({email, token});
     } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to verify OTP for forget password',
-      };
+      
     }
   }
   // verify email to verify the email
@@ -347,7 +325,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Reset password' })
   @Post('reset-password')
-  async resetPassword(@Req() req: Request, @Body() data: { password: string }) {
+  async resetPassword(
+    @Req() req: Request,
+    @Body() data: { password: string },
+  ) {
     try {
       const email = req.user.email;
       const token = req.user.userId;
@@ -430,52 +411,16 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('request-email-change')
   async requestEmailChange(
-    @Body() data: { email: string },
     @Req() req: Request,
+    @Body() data: { email: string },
   ) {
     try {
       const user_id = req.user.userId;
-      const email = data?.email;
+      const email = data.email;
       if (!email) {
         throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
       }
       return await this.authService.requestEmailChange(user_id, email);
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Something went wrong',
-      };
-    }
-  }
-
-  @ApiOperation({ summary: 'OTP verification for changing email' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @Post('changeEmailOtpVerify')
-  async changeEmailOtpVerify(@Body() data: { email: string; token: string }) {
-    try {
-      const email = data.email;
-      const token = data.token;
-
-      return await this.authService.changeEmailOtpVerify({ email, token });
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to verify OTP for changing email',
-      };
-    }
-  }
-
-   @ApiOperation({ summary: 'Request for new OTP for forget password' })
-  @Post('requestNewOtpChangeEmail')
-  async requestNewOtpChangeEmail(@Body() data: { email: string }) {
-    try {
-      const email = data.email;
-      if (!email) {
-        throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
-      }
-
-      return await this.authService.requestNewOtpChangeEmail(email);
     } catch (error) {
       return {
         success: false,
