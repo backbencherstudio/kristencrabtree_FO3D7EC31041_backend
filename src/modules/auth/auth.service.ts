@@ -3,6 +3,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -20,8 +21,6 @@ import { MailService } from '../../mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
-import { date } from 'zod';
-import { User } from '../admin/user/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +29,7 @@ export class AuthService {
     private prisma: PrismaService,
     private mailService: MailService,
     @InjectRedis() private readonly redis: Redis,
-  ) { }
+  ) {}
 
   async me(userId: string) {
     try {
@@ -530,7 +529,7 @@ export class AuthService {
       const importantFields = requiredFields.filter(
         (field) =>
           updateUserPreferencesDto[field as keyof UserPreferencesDto] ===
-          undefined ||
+            undefined ||
           updateUserPreferencesDto[field as keyof UserPreferencesDto] === null,
       );
       if (importantFields.length > 0) {
@@ -606,7 +605,7 @@ export class AuthService {
     }
   }
 
-  async requestNewOTP(email: string) {
+  async requestNewOtpForgetPass(email: string) {
     try {
       const user = await UserRepository.exist({
         field: 'email',
@@ -651,7 +650,6 @@ export class AuthService {
   }
 
   async forgotPasswordOtpVerify({ email, token }) {
-
     try {
       const user = await UserRepository.exist({
         field: 'email',
@@ -663,11 +661,12 @@ export class AuthService {
           token: token,
         });
         if (existToken) {
-
           //create a jwt token for password reset
           const payload = { email: email, sub: user.id };
-          const resetToken = this.jwtService.sign(payload, { secret: process.env.FORGET_PASS_JWT_SECRET, expiresIn: '15m' });
-          
+          const resetToken = this.jwtService.sign(payload, {
+            secret: process.env.FORGET_PASS_JWT_SECRET,
+            expiresIn: '15m',
+          });
 
           // delete otp code
           await UcodeRepository.deleteToken({
@@ -692,15 +691,11 @@ export class AuthService {
           message: 'Email not found',
         };
       }
-    } catch (error) {
-
-    }
-
+    } catch (error) {}
   }
 
   async resetPassword({ email, token, password }) {
     try {
-
       const user = await UserRepository.exist({
         field: 'email',
         value: email,
@@ -713,13 +708,10 @@ export class AuthService {
             password: password,
           });
           return {
-            data
+            data,
           };
-        } catch (error) {
-
-        }
+        } catch (error) {}
       }
-
     } catch (error) {
       return {
         success: false,
@@ -859,35 +851,155 @@ export class AuthService {
   async requestEmailChange(user_id: string, email: string) {
     try {
       const user = await UserRepository.getUserDetails(user_id);
-      if (user) {
-        const token = await UcodeRepository.createToken({
-          userId: user.id,
-          isOtp: true,
-          email: email,
-        });
+      console.log('user in auth.service ln-853:', user);
 
-        await this.mailService.sendOtpCodeToEmail({
-          email: email,
-          name: email,
-          otp: token,
-        });
-
-        return {
-          success: true,
-          message: 'We have sent an OTP code to your email',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
+      if (!user) {
+        throw new NotFoundException('User not found');
       }
+
+      if (user.email === email) {
+        throw new BadRequestException(
+          'New email must be different from current email',
+        );
+      }
+
+      const existedEmail = await UserRepository.exist({
+        field: 'email',
+        value: email,
+      });
+
+      if (existedEmail) {
+        throw new BadRequestException(
+          'This email is already registered to another account',
+        );
+      }
+
+      const token = await UcodeRepository.createToken({
+        userId: user.id,
+        isOtp: true,
+        email: email,
+      });
+
+      await this.mailService.sendOtpCodeToEmail({
+        email: email,
+        name: email,
+        otp: token,
+      });
+
+      return {
+        success: true,
+        message: 'We have sent an OTP code to your email',
+      };
     } catch (error) {
       return {
         success: false,
         message: error.message,
       };
     }
+  }
+
+  async changeEmailOtpVerify({ email, token }) {
+    try {
+      const existedEmail = await UserRepository.exist({
+        field: 'email',
+        value: email,
+      });
+
+      if (existedEmail) {
+        throw new BadRequestException(
+          'New email must be different from current email',
+        );
+      }
+
+      // Basic Email and Token check
+      if (!email && !token) {
+        throw new BadRequestException('Email or token not provided');
+      }
+
+      // Check Email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new BadRequestException('Invalid email format');
+      }
+
+      // Check token length and format
+      if (token.length !== 6 && !/^\d+$/.test(token)) {
+        throw new BadRequestException('Invalid token format');
+      }
+
+      // Validate Email and Token
+      const existToken = await UcodeRepository.validateToken({
+        email,
+        token,
+        forEmailChange: true,
+      });
+
+      if (existToken) {
+        // create a JWT  token for email update
+        const payload = { email };
+        const resetToken = this.jwtService.sign(payload, {
+          secret: process.env.FORGET_PASS_JWT_SECRET,
+          expiresIn: '15m',
+        });
+
+        // Delete all OTP records for the same combination of email and token
+        await UcodeRepository.deleteToken({
+          email,
+          token,
+        });
+
+        return {
+          success: true,
+          message: 'OTP verified successfully',
+          token: resetToken,
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Invalid token',
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Email not found',
+      };
+    }
+  }
+
+  async requestNewOtpChangeEmail(email) {
+    try {
+      const existedEmail = await UserRepository.exist({
+        field: 'email',
+        value: email,
+      });
+
+      if (existedEmail) {
+        throw new BadRequestException(
+          'New email must be different from current email',
+        );
+      }
+
+      const existingOtp = await this.prisma.ucode.findFirst({
+        where: {
+          email,
+        },
+      });
+      console.log('existingOtp in auth.service.ts ln-983', existingOtp);
+
+      if (existingOtp.expired_at < DateHelper.now()) {
+        await this.prisma.ucode.delete({
+          where: {
+            id: existingOtp.id,
+          },
+        });
+      } else {
+        return {
+          success: true,
+          message: 'OTP already sent. Please wait until it expires.',
+        };
+      }
+    } catch (error) {}
   }
 
   async changeEmail({
