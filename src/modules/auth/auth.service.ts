@@ -29,7 +29,7 @@ export class AuthService {
     private prisma: PrismaService,
     private mailService: MailService,
     @InjectRedis() private readonly redis: Redis,
-  ) {}
+  ) { }
 
   async me(userId: string) {
     try {
@@ -529,7 +529,7 @@ export class AuthService {
       const importantFields = requiredFields.filter(
         (field) =>
           updateUserPreferencesDto[field as keyof UserPreferencesDto] ===
-            undefined ||
+          undefined ||
           updateUserPreferencesDto[field as keyof UserPreferencesDto] === null,
       );
       if (importantFields.length > 0) {
@@ -691,7 +691,7 @@ export class AuthService {
           message: 'Email not found',
         };
       }
-    } catch (error) {}
+    } catch (error) { }
   }
 
   async resetPassword({ email, token, password }) {
@@ -710,7 +710,7 @@ export class AuthService {
           return {
             data,
           };
-        } catch (error) {}
+        } catch (error) { }
       }
     } catch (error) {
       return {
@@ -851,8 +851,6 @@ export class AuthService {
   async requestEmailChange(user_id: string, email: string) {
     try {
       const user = await UserRepository.getUserDetails(user_id);
-      console.log('user in auth.service ln-853:', user);
-
       if (!user) {
         throw new NotFoundException('User not found');
       }
@@ -873,6 +871,13 @@ export class AuthService {
           'This email is already registered to another account',
         );
       }
+      //check for existing otp
+      const existingCode = await this.prisma.ucode.findFirst({
+        where: {
+          email, user_id: user.id,
+        },
+      });
+
 
       const token = await UcodeRepository.createToken({
         userId: user.id,
@@ -999,7 +1004,7 @@ export class AuthService {
           message: 'OTP already sent. Please wait until it expires.',
         };
       }
-    } catch (error) {}
+    } catch (error) { }
   }
 
   async changeEmail({

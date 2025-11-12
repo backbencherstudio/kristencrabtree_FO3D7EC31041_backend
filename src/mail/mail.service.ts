@@ -7,7 +7,7 @@ import appConfig from '../config/app.config';
 @Injectable()
 export class MailService {
   constructor(
-    @InjectQueue('mail-queue1') private queue: Queue,
+    @InjectQueue('mail-queue') private queue: Queue,
     private mailerService: MailerService,
   ) {}
 
