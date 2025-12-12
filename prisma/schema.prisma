@@ -66,7 +66,7 @@ model User {
   email_verified_at DateTime?
 
   is_agrred_to_terms_and_policy Boolean?
-  is_two_factor_enabled         Int?    @default(0)
+  is_two_factor_enabled         Int?     @default(0)
   two_factor_secret             String? // secret key for two factor authentication
 
   accounts                  Account[]
@@ -84,6 +84,9 @@ model User {
   role_users           RoleUser[]
   payment_transactions PaymentTransaction[]
   UserPreferences      UserPreferences[]
+  quotes               Quote[]
+  journels             Journel[]
+  comments             Comments[]
 
   @@map("users")
 }
@@ -527,4 +530,97 @@ model Content {
   author  String?
 
   @@map("contents")
+}
+
+///////////////////////////////////////
+//////// Home page////////////////// 
+///////////////////////////////////////
+
+model Quote {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  quote_author String?
+  quote_text   String? @db.Text
+  reason       String? @db.Text
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  @@map("quotes")
+}
+
+enum JournalType {
+  Text
+  Audio
+}
+
+model Journel {
+  id         String       @id @default(cuid())
+  created_at DateTime     @default(now())
+  updated_at DateTime     @default(now())
+  deleted_at DateTime?
+  type       JournalType?
+
+  title       String?
+  body        String?  @db.Text
+  audio       String?
+  tags        String[]
+  liked_users String[]
+  user_id     String?
+  user        User?    @relation(fields: [user_id], references: [id])
+
+  @@map("journels")
+}
+
+enum MurmurationType {
+  Text
+  Image
+  Audio
+}
+
+model Murmuration {
+  id         String           @id @default(cuid())
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+  deleted_at DateTime?
+  type       MurmurationType?
+
+  text  String? @db.Text
+  image String?
+  audio String?
+
+  shared_from_id String?
+  shared_from    Murmuration?  @relation("MurmurationShares", fields: [shared_from_id], references: [id])
+  shares         Murmuration[] @relation("MurmurationShares")
+
+  liked_users String[]
+  comments    Comments[]
+
+  @@map("murmurations")
+}
+
+model Comments {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  murmuration_id String?
+  murmuration    Murmuration? @relation(fields: [murmuration_id], references: [id])
+
+  reply_to_comment_id String?
+  reply_to_comment    Comments? @relation("CommentReplies", fields: [reply_to_comment_id], references: [id])
+   
+  liked_users String[]
+
+  body     String?    @db.Text
+  comments Comments[] @relation("CommentReplies")
+
+  @@map("comments")
 }
