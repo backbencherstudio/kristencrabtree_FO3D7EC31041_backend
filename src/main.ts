@@ -11,7 +11,7 @@ import { AppModule } from './app.module';
 import appConfig from './config/app.config';
 import { CustomExceptionFilter } from './common/exception/custom-exception.filter';
 import { SojebStorage } from './common/lib/Disk/SojebStorage';
-
+import * as path from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
@@ -31,11 +31,11 @@ async function bootstrap() {
   //   }
   //   next();
   // });
-  app.useStaticAssets(join(__dirname, '..', 'public'), {
+  app.useStaticAssets(path.join(process.cwd(), 'public'), {
     index: false,
     prefix: '/public',
   });
-  app.useStaticAssets(join(__dirname, '..', 'public/storage'), {
+  app.useStaticAssets(path.join(process.cwd(), 'public/storage'), {
     index: false,
     prefix: '/storage',
   });

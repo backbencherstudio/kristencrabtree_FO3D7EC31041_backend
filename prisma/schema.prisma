@@ -87,6 +87,9 @@ model User {
   quotes               Quote[]
   journels             Journel[]
   comments             Comments[]
+  likeJournels         LikeJournel[]
+  murmurationLikes     MurmurationLike[]
+  commentLikes         CommentLike[]
 
   @@map("users")
 }
@@ -564,15 +567,29 @@ model Journel {
   deleted_at DateTime?
   type       JournalType?
 
-  title       String?
-  body        String?  @db.Text
-  audio       String?
-  tags        String[]
-  liked_users String[]
-  user_id     String?
-  user        User?    @relation(fields: [user_id], references: [id])
+  title String?
+  body  String?  @db.Text
+  audio String?
+  tags  String[]
+
+  user_id      String?
+  user         User?         @relation(fields: [user_id], references: [id])
+  likeJournels LikeJournel[]
 
   @@map("journels")
+}
+
+model LikeJournel {
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  userId    String
+  journelId String
+
+  user    User    @relation(fields: [userId], references: [id])
+  journel Journel @relation(fields: [journelId], references: [id])
+
+  @@id([userId, journelId])
 }
 
 enum MurmurationType {
@@ -596,10 +613,21 @@ model Murmuration {
   shared_from    Murmuration?  @relation("MurmurationShares", fields: [shared_from_id], references: [id])
   shares         Murmuration[] @relation("MurmurationShares")
 
-  liked_users String[]
-  comments    Comments[]
+  comments         Comments[]
+  murmurationLikes MurmurationLike[]
 
   @@map("murmurations")
+}
+
+model MurmurationLike {
+  userId        String
+  murmurationId String
+
+  user        User        @relation(fields: [userId], references: [id])
+  murmuration Murmuration @relation(fields: [murmurationId], references: [id])
+
+  @@id([userId, murmurationId])
+  @@index([murmurationId])
 }
 
 model Comments {
@@ -616,11 +644,21 @@ model Comments {
 
   reply_to_comment_id String?
   reply_to_comment    Comments? @relation("CommentReplies", fields: [reply_to_comment_id], references: [id])
-   
-  liked_users String[]
 
-  body     String?    @db.Text
-  comments Comments[] @relation("CommentReplies")
+  body         String?       @db.Text
+  comments     Comments[]    @relation("CommentReplies")
+  commentLikes CommentLike[]
 
   @@map("comments")
+}
+
+model CommentLike {
+  userId    String
+  commentId String
+
+  user    User     @relation(fields: [userId], references: [id])
+  comment Comments @relation(fields: [commentId], references: [id])
+
+  @@id([userId, commentId])
+  @@index([commentId])
 }

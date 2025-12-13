@@ -20,6 +20,9 @@ import { AdminModule } from './modules/admin/admin.module';
 import { ApplicationModule } from './modules/application/application.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { JournelsModule } from './modules/journels/journels.module';
+import { QuotesModule } from './modules/quotes/quotes.module';
+import { MurmurationModule } from './modules/murmuration/murmuration.module';
 
 @Module({
   imports: [
@@ -74,6 +77,9 @@ import { PaymentModule } from './modules/payment/payment.module';
     AdminModule,
     ChatModule,
     PaymentModule,
+    JournelsModule,
+    QuotesModule,
+    MurmurationModule,
   ],
   controllers: [AppController],
   providers: [
