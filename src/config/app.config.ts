@@ -89,6 +89,7 @@ export default () => ({
     avatar: '/avatar',
     websiteInfo: '/website-info',
     audio: '/audio/',
+    image: '/image/',
     // chat
     attachment: '/attachment',
   },

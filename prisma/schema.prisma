@@ -92,6 +92,7 @@ model User {
   commentLikes         CommentLike[]
 
   @@map("users")
+  murmurations Murmuration[]
 }
 
 ///////////////////////////////
@@ -604,6 +605,9 @@ model Murmuration {
   updated_at DateTime         @updatedAt
   deleted_at DateTime?
   type       MurmurationType?
+  title  String?
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
 
   text  String? @db.Text
   image String?
