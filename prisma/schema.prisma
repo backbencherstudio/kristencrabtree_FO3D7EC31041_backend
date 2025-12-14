@@ -666,3 +666,8 @@ model CommentLike {
   @@id([userId, commentId])
   @@index([commentId])
 }
+
+
+
+/////////////////////admin modules///////////////////////
+
