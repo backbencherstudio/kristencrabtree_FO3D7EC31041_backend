@@ -156,7 +156,7 @@ export class QuotesService {
       }
 
       const adminQuote = await this.prisma.quote.findUnique({
-        where: { id: quoteId },
+        where: { id: quoteId, status: true },
         include: {
           user: {
             select: {
@@ -218,7 +218,7 @@ export class QuotesService {
       };
     }
   }
-  async getRandomAdminQuote(userId:string) {
+  async getRandomAdminQuote(userId: string) {
     try {
       const total = await this.prisma.quote.count({
         where: {
@@ -237,7 +237,6 @@ export class QuotesService {
       }
 
       const randomIndex = Math.floor(Math.random() * total);
-      
 
       const quote = await this.prisma.quote.findFirst({
         where: {
@@ -245,8 +244,8 @@ export class QuotesService {
             type: 'admin',
           },
         },
-        orderBy:{
-          created_at:'asc'
+        orderBy: {
+          created_at: 'asc',
         },
         skip: randomIndex,
         take: 1,
