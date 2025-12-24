@@ -60,7 +60,7 @@ export class AuthController {
       const type = data.type;
       const is_agrred_to_terms_and_policy = data.is_agrred_to_terms_and_policy;
 
-      if(is_agrred_to_terms_and_policy == false){
+      if (is_agrred_to_terms_and_policy == false) {
         throw new HttpException(
           'You must agree to the terms and policy',
           HttpStatus.UNAUTHORIZED,
@@ -266,17 +266,33 @@ export class AuthController {
     }
   }
 
+  @ApiOperation({ summary: 'Forgot password' })
+  @Post('requestNewOtpForgetPass')
+  async resendForgotPasswordOtp(@Body() data: { email: string }) {
+    try {
+      const email = data.email;
+      if (!email) {
+        throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
+      }
+      return await this.authService.resendForgotPasswordOtp(email);
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Something went wrong',
+      };
+    }
+  }
 
   @Post('forgetPasswordOtpVerify')
-  async forgetPasswordOtpVerify(@Body() data: { email: string; token: string }) {
+  async forgetPasswordOtpVerify(
+    @Body() data: { email: string; token: string },
+  ) {
     try {
       const email = data.email;
       const token = data.token;
-      
-      return await this.authService.forgotPasswordOtpVerify({email, token});
-    } catch (error) {
-      
-    }
+
+      return await this.authService.forgotPasswordOtpVerify({ email, token });
+    } catch (error) {}
   }
   // verify email to verify the email
   @ApiOperation({ summary: 'Verify email' })
@@ -325,10 +341,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Reset password' })
   @Post('reset-password')
-  async resetPassword(
-    @Req() req: Request,
-    @Body() data: { password: string },
-  ) {
+  async resetPassword(@Req() req: Request, @Body() data: { password: string }) {
     try {
       const email = req.user.email;
       const token = req.user.userId;
