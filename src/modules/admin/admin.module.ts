@@ -7,6 +7,7 @@ import { UserModule } from './user/user.module';
 import { NotificationModule } from './notification/notification.module';
 import { PlansModule } from './plans/plans.module';
 import { UserPageModule } from './user_page/user_page.module';
+import { ContentManagementModule } from './content_management/content_management.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { UserPageModule } from './user_page/user_page.module';
     NotificationModule,
     PlansModule,
     UserPageModule,
+    ContentManagementModule,
   ],
 })
 export class AdminModule {}

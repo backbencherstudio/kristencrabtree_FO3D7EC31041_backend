@@ -41,7 +41,7 @@ export class QuotesService {
   async findAll(user_id: string) {
     try {
       const user = await this.prisma.user.findUnique({
-        where: { id: user_id },
+        where: { id: user_id, type: 'user' },
       });
 
       if (!user) {
@@ -135,6 +135,131 @@ export class QuotesService {
       return {
         success: false,
         message: 'Failed to delete quote',
+        error: error.message || error,
+      };
+    }
+  }
+  async reactToggle(quoteId: string, userId: string) {
+    try {
+      // Check if the user is valid
+      const validUser = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+      if (!validUser) {
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
+
+      const adminQuote = await this.prisma.quote.findUnique({
+        where: { id: quoteId, status: true },
+        include: {
+          user: {
+            select: {
+              id: true,
+              type: true,
+            },
+          },
+        },
+      });
+
+      if (!adminQuote || adminQuote.user.type !== 'admin') {
+        return {
+          success: false,
+          message: 'Only admin quotes can be reacted to',
+        };
+      }
+
+      const existingReaction = await this.prisma.quoteReaction.findUnique({
+        where: {
+          userId_qouteId: {
+            userId: userId,
+            qouteId: quoteId,
+          },
+        },
+      });
+
+      if (existingReaction) {
+        await this.prisma.quoteReaction.delete({
+          where: {
+            userId_qouteId: {
+              userId: userId,
+              qouteId: quoteId,
+            },
+          },
+        });
+
+        return {
+          success: true,
+          message: 'Reaction removed successfully',
+        };
+      } else {
+        await this.prisma.quoteReaction.create({
+          data: {
+            userId: userId,
+            qouteId: quoteId,
+          },
+        });
+
+        return {
+          success: true,
+          message: 'Reaction added successfully',
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: 'An error occurred while processing the request',
+        error: error.message,
+      };
+    }
+  }
+  async getRandomAdminQuote(userId: string) {
+    try {
+      const total = await this.prisma.quote.count({
+        where: {
+          user: {
+            type: 'admin',
+          },
+        },
+      });
+
+      if (total === 0) {
+        return {
+          success: true,
+          message: 'No admin quotes found',
+          data: null,
+        };
+      }
+
+      const randomIndex = Math.floor(Math.random() * total);
+
+      const quote = await this.prisma.quote.findFirst({
+        where: {
+          user: {
+            type: 'admin',
+          },
+        },
+        orderBy: {
+          created_at: 'asc',
+        },
+        skip: randomIndex,
+        take: 1,
+      });
+
+      return {
+        success: true,
+        message: 'Random admin quote retrieved',
+        data: quote,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to fetch random quote',
         error: error.message || error,
       };
     }

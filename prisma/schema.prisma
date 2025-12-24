@@ -90,9 +90,10 @@ model User {
   likeJournels         LikeJournel[]
   murmurationLikes     MurmurationLike[]
   commentLikes         CommentLike[]
-
+  murmurations         Murmuration[]
+  quoteReactions       QuoteReaction[]
   @@map("users")
-  murmurations Murmuration[]
+  meditationListeners MeditationListener[]
 }
 
 ///////////////////////////////
@@ -550,10 +551,26 @@ model Quote {
   quote_text   String? @db.Text
   reason       String? @db.Text
 
-  user_id String?
-  user    User?   @relation(fields: [user_id], references: [id])
+  status Boolean? @default(true)
+
+  user_id        String?
+  user           User?           @relation(fields: [user_id], references: [id])
+  quoteReactions QuoteReaction[]
 
   @@map("quotes")
+}
+
+model QuoteReaction {
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  userId  String
+  qouteId String
+
+  user  User  @relation(fields: [userId], references: [id])
+  qoute Quote @relation(fields: [qouteId], references: [id])
+
+  @@id([userId, qouteId])
 }
 
 enum JournalType {
@@ -605,9 +622,9 @@ model Murmuration {
   updated_at DateTime         @updatedAt
   deleted_at DateTime?
   type       MurmurationType?
-  title  String?
-  user_id String?
-  user    User?   @relation(fields: [user_id], references: [id])
+  title      String?
+  user_id    String?
+  user       User?            @relation(fields: [user_id], references: [id])
 
   text  String? @db.Text
   image String?
@@ -665,6 +682,32 @@ model CommentLike {
 
   @@id([userId, commentId])
   @@index([commentId])
+}
+
+model Meditation {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  meditation_name        String?
+  meditation_description String?
+  meditation_audio       String?
+
+  listeners MeditationListener[]
+
+  @@map("meditation")
+}
+
+model MeditationListener {
+  userId       String
+  meditationId String
+
+  user       User       @relation(fields: [userId], references: [id])
+  meditation Meditation @relation(fields: [meditationId], references: [id])
+
+  @@id([userId, meditationId])
+  @@index([meditationId])
 }
 
 

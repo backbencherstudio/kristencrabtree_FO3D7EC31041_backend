@@ -32,10 +32,24 @@ export class QuotesController {
     return this.quotesService.findAll(userID);
   }
 
+  @Get('random')
+  findRandom(
+    @Req() req:any,
+  ){
+    const userId = req.user.userId;
+    return this.quotesService.getRandomAdminQuote(userId)
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
     const userID = req.user?.userId;
-    return this.quotesService.findOne(id , userID);
+    return this.quotesService.findOne(id, userID);
+  }
+
+  @Post('addRemoveReact/:id')
+  addReaction(@Param('id') id: string, @Req() req: any) {
+    const userID = req.user?.userId;
+    return this.quotesService.reactToggle(id, userID);
   }
 
   @Delete(':id')
