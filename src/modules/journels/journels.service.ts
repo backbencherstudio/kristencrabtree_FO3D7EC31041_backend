@@ -67,32 +67,96 @@ export class JournelsService {
       throw error;
     }
   }
-  async findAll() {
+  // async findAll(userId:string) {
+  //   try {
+
+  //     const user = await this.prisma.user.findUnique({
+  //       where:{
+  //         id:userId
+  //       }
+  //     })
+  //     if(!user){
+  //       return{
+  //         success:false ,
+  //         message:"user not found"
+  //       }
+  //     }
+
+  //     const journels = await this.prisma.journel.findMany({
+  //       include: {
+  //         _count: {
+  //           select: { likeJournels: true },
+  //         },
+  //       },
+  //     });
+
+  //     if (journels.length === 0) {
+  //       return {
+  //         success: true,
+  //         message: 'No journels found, please create one',
+  //         data: [],
+  //       };
+  //     }
+
+  //     const result = journels.map(({ _count, ...journel }) => ({
+  //       ...journel,
+  //       likeCount: _count.likeJournels,
+  //     }));
+
+  //     return {
+  //       success: true,
+  //       message: 'Journels retrieved successfully',
+  //       data: result,
+  //     };
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
+  async findAll(userId: string) {
     try {
-      const journels = await this.prisma.journel.findMany({
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
+
+      const journals = await this.prisma.journel.findMany({
         include: {
           _count: {
-            select: { likeJournels: true },
+            select: { likeJournels: true }, 
+          },
+          likeJournels: {
+            where: {
+              userId: userId, 
+            },
           },
         },
       });
 
-      if (journels.length === 0) {
+      if (journals.length === 0) {
         return {
           success: true,
-          message: 'No journels found, please create one',
+          message: 'No journals found, please create one',
           data: [],
         };
       }
 
-      const result = journels.map(({ _count, ...journel }) => ({
+      const result = journals.map(({ _count, likeJournels, ...journel }) => ({
         ...journel,
         likeCount: _count.likeJournels,
+        isLiked: likeJournels.length > 0,
       }));
 
       return {
         success: true,
-        message: 'Journels retrieved successfully',
+        message: 'Journals retrieved successfully',
         data: result,
       };
     } catch (error) {
