@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { SojebStorage } from './common/lib/Disk/SojebStorage';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class AppService {
   getHello(): string {
-    return 'Hello world';
+    const templatePath = path.join(process.cwd(), 'src', 'mail', 'templates', 'hello.html');
+    const template = fs.readFileSync(templatePath, 'utf-8');
+    return template;
   }
 
   async test(image: Express.Multer.File) {
