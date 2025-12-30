@@ -67,8 +67,31 @@ export class JournelsService {
       throw error;
     }
   }
-  async findAll() {
+  async findAll(userId: string) {
     try {
+      if (!userId) {
+        return { success: false, message: 'User ID is required' };
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+
+      let isLikedAJournel = async (journelId: strinyag) => {
+        const like = await this.prisma.likeJournel.findUnique({
+          where: {
+            userId_journelId: {
+              userId: userId,
+              journelId: journelId,
+            },
+          },
+        });
+        return !!like;
+      }
+
       const journels = await this.prisma.journel.findMany({
         include: {
           _count: {
@@ -85,9 +108,10 @@ export class JournelsService {
         };
       }
 
-      const result = journels.map(({ _count, ...journel }) => ({
+      const result = journels.map(async ({ _count, ...journel }) => ({
         ...journel,
         likeCount: _count.likeJournels,
+        //isLiked: await isLikedAJournel(journel.id),
       }));
 
       return {

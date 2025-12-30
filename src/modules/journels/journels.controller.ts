@@ -40,9 +40,11 @@ export class JournelsController {
       };
     }
   }
+  @UseGuards(JwtAuthGuard)
   @Get('all')
-  findAll() {
-    return this.journelsService.findAll();
+  findAll(@Req() req: any) {
+    const user_id = req.user?.userId;
+    return this.journelsService.findAll(user_id);
   }
   @UseGuards(JwtAuthGuard)
   @Get('reccommended')
