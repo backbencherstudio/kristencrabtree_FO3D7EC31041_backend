@@ -83,15 +83,15 @@ export default () => ({
     rootUrl: './public/storage',
     rootUrlPublic: '/public/storage',
     // storage directory
-    package: '/package',
-    destination: '/destination',
-    blog: '/blog',
-    avatar: '/avatar',
-    websiteInfo: '/website-info',
+    package: '/package/',
+    destination: '/destination/',
+    blog: '/blog/',
+    avatar: '/avatar/',
+    websiteInfo: '/website-info/',
     audio: '/audio/',
     image: '/image/',
     // chat
-    attachment: '/attachment',
+    attachment: '/attachment/',
   },
 
   defaultUser: {

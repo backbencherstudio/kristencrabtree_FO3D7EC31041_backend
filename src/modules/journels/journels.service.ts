@@ -130,11 +130,18 @@ export class JournelsService {
       const journals = await this.prisma.journel.findMany({
         include: {
           _count: {
-            select: { likeJournels: true }, 
+            select: { likeJournels: true },
+          },
+          user:{
+            select:{
+              id:true,
+              name:true,
+              avatar:true
+            }
           },
           likeJournels: {
             where: {
-              userId: userId, 
+              userId: userId,
             },
           },
         },
@@ -152,12 +159,13 @@ export class JournelsService {
         ...journel,
         likeCount: _count.likeJournels,
         isLiked: likeJournels.length > 0,
+  
       }));
 
       return {
         success: true,
         message: 'Journals retrieved successfully',
-        data: result,
+        data: result
       };
     } catch (error) {
       throw error;

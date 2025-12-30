@@ -172,19 +172,73 @@ export class MurmurationService {
       };
     }
   }
-  async findAll() {
+  async findAll(user_id: string) {
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: user_id },
+        select: { id: true },
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
+
       const murmurations = await this.prisma.murmuration.findMany({
-        include: {
+        select: {
+          id: true,
+          type: true,
+          text: true,
+          title: true,
+          image: true,
+          audio: true,
+          created_at: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              avatar: true,
+            },
+          },
           _count: {
-            select: { murmurationLikes: true, comments: true },
+            select: {
+              murmurationLikes: true,
+              comments: true,
+            },
+          },
+          murmurationLikes: {
+            where: {
+              userId: user_id,
+            },
           },
         },
       });
+
+      const data = murmurations.map((m) => ({
+        id: m.id,
+        type: m.type,
+        text: m.text,
+        title: m.title,
+        media: {
+          image: m.image,
+          audio: m.audio,
+        },
+        createdAt: m.created_at,
+        user: m.user,
+        stats: {
+          likes: m._count.murmurationLikes,
+          comments: m._count.comments,
+        },
+        isLiked: m.murmurationLikes.length > 0,
+      }));
+
       return {
         success: true,
         message: 'Murmurations fetched successfully',
-        data: murmurations,
+        data,
       };
     } catch (error) {
       return {
@@ -194,18 +248,49 @@ export class MurmurationService {
       };
     }
   }
-  async findOne(id: string) {
+
+  async findOne(id: string, user_id: string) {
     try {
       const murmuration = await this.prisma.murmuration.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          created_at: true,
+          updated_at: true,
+          type: true,
+          title: true,
+          text: true,
+          image: true,
+          audio: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              avatar: true,
+            },
+          },
+          _count: {
+            select: {
+              murmurationLikes: true,
+              comments: true,
+            },
+          },
+          murmurationLikes: {
+            where: {
+              userId: user_id,
+            },
+          },
           comments: {
             where: {
               reply_to_comment_id: null,
               deleted_at: null,
             },
             orderBy: { created_at: 'asc' },
-            include: {
+            select: {
+              id: true,
+              body: true,
+              created_at: true,
               user: {
                 select: {
                   id: true,
@@ -220,10 +305,20 @@ export class MurmurationService {
                   comments: true,
                 },
               },
+              commentLikes: {
+                where: {
+                  userId: user_id,
+                },
+              },
               comments: {
-                where: { deleted_at: null },
+                where: {
+                  deleted_at: null,
+                },
                 orderBy: { created_at: 'asc' },
-                include: {
+                select: {
+                  id: true,
+                  body: true,
+                  created_at: true,
                   user: {
                     select: {
                       id: true,
@@ -238,14 +333,13 @@ export class MurmurationService {
                       comments: true,
                     },
                   },
+                  commentLikes: {
+                    where: {
+                      userId: user_id,
+                    },
+                  },
                 },
               },
-            },
-          },
-          _count: {
-            select: {
-              murmurationLikes: true,
-              comments: true,
             },
           },
         },
@@ -260,35 +354,41 @@ export class MurmurationService {
 
       const formatted = {
         id: murmuration.id,
-        created_at: murmuration.created_at,
-        updated_at: murmuration.updated_at,
         type: murmuration.type,
         title: murmuration.title,
         text: murmuration.text,
-        image: murmuration.image,
-        audio: murmuration.audio,
-        post_counts: {
+        media: {
+          image: murmuration.image,
+          audio: murmuration.audio,
+        },
+        createdAt: murmuration.created_at,
+        updatedAt: murmuration.updated_at,
+        user: murmuration.user,
+        stats: {
           likes: murmuration._count.murmurationLikes,
           comments: murmuration._count.comments,
         },
+        isLiked: murmuration.murmurationLikes.length > 0,
         comments: murmuration.comments.map((comment) => ({
           id: comment.id,
           body: comment.body,
-          created_at: comment.created_at,
+          createdAt: comment.created_at,
           user: comment.user,
-          comment_counts: {
+          stats: {
             likes: comment._count.commentLikes,
             replies: comment._count.comments,
           },
+          isLiked: comment.commentLikes.length > 0,
           replies: comment.comments.map((reply) => ({
             id: reply.id,
             body: reply.body,
-            created_at: reply.created_at,
+            createdAt: reply.created_at,
             user: reply.user,
-            comment_counts: {
+            stats: {
               likes: reply._count.commentLikes,
               replies: reply._count.comments,
             },
+            isLiked: reply.commentLikes.length > 0,
           })),
         })),
       };
@@ -306,6 +406,7 @@ export class MurmurationService {
       };
     }
   }
+
   remove(id: string) {
     return `This action removes a #${id} murmuration`;
   }

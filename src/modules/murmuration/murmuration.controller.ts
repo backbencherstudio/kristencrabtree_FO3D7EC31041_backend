@@ -55,14 +55,16 @@ export class MurmurationController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
-    return this.murmurationService.findAll();
+  findAll(@Req() req: any) {
+    return this.murmurationService.findAll(req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.murmurationService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.murmurationService.findOne(id, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
