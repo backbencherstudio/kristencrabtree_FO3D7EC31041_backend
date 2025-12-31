@@ -17,6 +17,7 @@ import { CreateContentManagementDto } from './dto/create-content_management.dto'
 import { UpdateContentManagementDto } from './dto/update-content_management.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { use } from 'passport';
 
 @Controller('admin/content-management')
 export class ContentManagementController {
@@ -47,6 +48,7 @@ export class ContentManagementController {
     }
   }
 
+
   @UseGuards(JwtAuthGuard)
   @Get('allqoutes')
   findAll(@Req() req: any) {
@@ -60,9 +62,18 @@ export class ContentManagementController {
     return this.contentManagementService.findAllQoutes(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('meditaions')
-  findAllM() {
-    return this.contentManagementService.findAllMeditations();
+  findAllM(@Req() req: any) {
+    const userId = req.user?.userId;
+    return this.contentManagementService.findAllMeditations(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('favorite-meditations')
+  getFavoriteMeditations(@Req() req: any) {
+    const userId = req.user?.userId;
+    return this.contentManagementService.getFavoriteMeditations(userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -71,6 +82,20 @@ export class ContentManagementController {
     const qouteId = id;
     const userId = req.user?.userId;
     return this.contentManagementService.updateQuoteStatus(userId, qouteId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('addlistener/:meditation_id')
+  async addListener(@Param('meditation_id') meditation_id: string, @Req() req: any) {
+    const userId = req.user?.userId;
+    return this.contentManagementService.addListener(userId, meditation_id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('addfavorite/:meditation_id')
+  async addFavorite(@Param('meditation_id') meditation_id: string, @Req() req: any) {
+    const userId = req.user?.userId;
+    return this.contentManagementService.addFavoriteMeditation(userId, meditation_id);
   }
 
   @UseGuards(JwtAuthGuard)

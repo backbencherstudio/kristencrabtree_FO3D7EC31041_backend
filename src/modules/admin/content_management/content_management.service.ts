@@ -57,41 +57,55 @@ export class ContentManagementService {
       data: newMeditation,
     };
   }
-  async findAllMeditations() {
-    try {
-      const meditations = await this.prisma.meditation.findMany({
-        include: {
-          _count: {
-            select: {
-              listeners: true,
+async findAllMeditations(userId: string) {
+  try {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
+
+    const meditations = await this.prisma.meditation.findMany({
+      include: {
+        _count: {
+          select: {
+            listeners: true,
+            favoriteMeditations: {
+              where: {
+                user_id: userId,
+                deleted_at: null,
+              },
             },
           },
         },
-      });
+      },
+    });
 
-      if (meditations.length === 0) {
-        return {
-          success: false,
-          message: 'Currently no meditations available',
-        };
-      }
-
-      const data = meditations.map((meditation) => ({
-        ...meditation,
-        listenersCount: meditation._count.listeners,
-        audio_url: `http://localhost:4020/public/storage/audio/${meditation.meditation_audio}`,
-        _count: undefined,
-      }));
-
+    if (meditations.length === 0) {
       return {
-        success: true,
-        message: 'Meditations retrieved successfully',
-        data,
+        success: false,
+        message: 'Currently no meditations available',
       };
-    } catch (error) {
-      throw error;
     }
+
+    const data = meditations.map((meditation) => ({
+      ...meditation,
+      listenersCount: meditation._count.listeners,
+      isFav: meditation._count.favoriteMeditations > 0,
+      _count: undefined,
+    }));
+
+    return {
+      success: true,
+      message: 'Meditations retrieved successfully',
+      data,
+    };
+  } catch (error) {
+    throw error;
   }
+}
 
   async update(
     user_id: string,
@@ -151,12 +165,109 @@ export class ContentManagementService {
       data: updatedMeditation,
     };
   }
+  async addListener(userId: string, meditationId: string) {
+    try {
+      await this.prisma.meditationListener.create({
+        data: {
+          userId,
+          meditationId,
+        },
+      });
 
-  remove(userid:string,id: string) {
+      return {
+        success: true,
+        message: 'added listener successfully',
+        liked: true,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async addFavoriteMeditation(userId: string, meditationId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+      const checkMeditation = await this.prisma.meditation.findUnique({
+        where: { id: meditationId },
+      });
+      if (!checkMeditation) {
+        return { success: false, message: 'Meditation not found' };
+      }
+
+      const existingFavorite = await this.prisma.favoriteMeditation.findFirst({
+        where: {
+          user_id: userId,
+          meditation_id: meditationId,
+        },
+      });
+      if (existingFavorite) {
+        await this.prisma.favoriteMeditation.delete({
+          where: { id: existingFavorite.id },
+        });
+        return {
+          success: true,
+          message: 'Favorite meditation removed successfully',
+        };
+      } else {
+        await this.prisma.favoriteMeditation.create({
+          data: {
+            user_id: userId,
+            meditation_id: meditationId,
+          },
+        });
+
+        return {
+          success: true,
+          message: 'Favorite meditation added successfully',
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getFavoriteMeditations(userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+      const favorites = await this.prisma.favoriteMeditation.findMany({
+        where: { user_id: userId },
+        include: {
+          meditation: true,
+        },
+      });
+      if (favorites.length === 0) {
+        return {
+          success: true,
+          message: 'No favorite meditations found',
+          data: [],
+        };
+      }
+      return {
+        success: true,
+        message: 'Favorite meditations retrieved successfully',
+        data: favorites,
+      };
+    }
+    catch (error) {
+      throw error;
+    }
+  }
+
+  remove(userid: string, id: string) {
     return `This action removes a #${id} contentManagement`;
   }
 
-  //Meditations management start
+  //Meditations management end
 
   //qoute management start
   async findAllQoutes(userId: string) {

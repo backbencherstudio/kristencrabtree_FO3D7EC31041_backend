@@ -94,6 +94,7 @@ model User {
   quoteReactions       QuoteReaction[]
   @@map("users")
   meditationListeners MeditationListener[]
+  favoriteMeditations favoriteMeditation[]
 }
 
 ///////////////////////////////
@@ -697,6 +698,7 @@ model Meditation {
   listeners MeditationListener[]
 
   @@map("meditation")
+  favoriteMeditations favoriteMeditation[]
 }
 
 model MeditationListener {
@@ -708,6 +710,21 @@ model MeditationListener {
 
   @@id([userId, meditationId])
   @@index([meditationId])
+}
+
+model favoriteMeditation {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  meditation_id String?
+  meditation    Meditation? @relation(fields: [meditation_id], references: [id])
+
+  @@map("favorite_meditation")
 }
 
 
