@@ -165,23 +165,53 @@ export class ContentManagementService {
     };
   }
   async addListener(userId: string, meditationId: string) {
-    try {
-      await this.prisma.meditationListener.create({
-        data: {
-          userId,
-          meditationId,
-        },
-      });
+  try {
 
-      return {
-        success: true,
-        message: 'added listener successfully',
-        liked: true,
+    const user = await this.prisma.user.findUnique({
+      where:{
+        id:userId
+      }
+    })
+    if(!user){
+       return {
+        success: false,
+        message: "No user found",
       };
-    } catch (error) {
-      throw error;
     }
+    const checkAlready = await this.prisma.meditationListener.findUnique({
+      where: {
+        userId_meditationId: {
+          userId: userId,
+          meditationId: meditationId,
+        },
+      },
+    });
+
+    if (checkAlready) {
+      return {
+        success: false,
+        message: "Already a listener",
+      };
+    }
+
+    await this.prisma.meditationListener.create({
+      data: {
+        userId,
+        meditationId,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Added listener successfully",
+      liked: true,
+    };
+  } catch (error) {
+    throw error;
   }
+}
+
+
   async addFavoriteMeditation(userId: string, meditationId: string) {
     try {
       const user = await this.prisma.user.findUnique({

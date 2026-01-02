@@ -92,9 +92,12 @@ model User {
   commentLikes         CommentLike[]
   murmurations         Murmuration[]
   quoteReactions       QuoteReaction[]
+  meditationListeners  MeditationListener[]
+  favoriteMeditations  favoriteMeditation[]
+  layers               Layers[]
+  digs                 Digs[]
+
   @@map("users")
-  meditationListeners MeditationListener[]
-  favoriteMeditations favoriteMeditation[]
 }
 
 ///////////////////////////////
@@ -695,10 +698,10 @@ model Meditation {
   meditation_description String?
   meditation_audio       String?
 
-  listeners MeditationListener[]
+  listeners           MeditationListener[]
+  favoriteMeditations favoriteMeditation[]
 
   @@map("meditation")
-  favoriteMeditations favoriteMeditation[]
 }
 
 model MeditationListener {
@@ -727,7 +730,44 @@ model favoriteMeditation {
   @@map("favorite_meditation")
 }
 
+model Digs {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
+  title      String
 
-/////////////////////admin modules///////////////////////
+  user_id String?
+  user    User?    @relation(fields: [user_id], references: [id])
 
+  layers Layers[]
+}
+
+enum Type {
+  Text
+  Option
+}
+
+model Layers {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  dig_id String
+  dig    Digs   @relation(fields: [dig_id], references: [id], onDelete: Cascade)
+
+  question_name String?
+  question_type Type?
+  point         Int?
+  question      String?
+
+  options       String[]
+  other         Boolean?
+  other_text    String?
+  text          String?
+}
