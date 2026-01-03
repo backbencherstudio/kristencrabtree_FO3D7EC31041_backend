@@ -13,6 +13,7 @@ import {
 import { DigsService } from './digs.service';
 import { CreateDigDto, SaveResponseDto } from './dto/create-dig.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { User } from '../user/entities/user.entity';
 
 @Controller('admin/digs')
 export class DigsController {
@@ -23,6 +24,13 @@ export class DigsController {
   create(@Body() createDigDto: CreateDigDto, @Req() req: any) {
     const userId = req.user?.userId;
     return this.digsService.create(userId, createDigDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('points')
+  getPoints(@Req() req: any) {
+    const userId = req.user?.userId;
+    return this.digsService.getPointsdict(userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -39,10 +47,18 @@ export class DigsController {
     }
 
     return this.digsService.saveUserResponses(userId, digId, body.answers);
-  } 
+  }
 
+
+  @Get(':id')
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.digsService.getSingleDig(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
-    return this.digsService.getAlldigs();
+  findAll(@Req() req: any) {
+    const userId = req.user?.userId;
+    return this.digsService.getAlldigs(userId);
   }
 }

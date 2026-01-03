@@ -21,6 +21,7 @@ import { MailService } from '../../mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
+import {DigsService} from '../admin/digs/digs.service'
 
 @Injectable()
 export class AuthService {
@@ -31,59 +32,47 @@ export class AuthService {
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
-  async me(userId: string) {
-    try {
-      const user = await this.prisma.user.findFirst({
-        where: {
-          id: userId,
-        },
-        select: {
-          id: true,
-          name: true,
-          first_name: true,
-          last_name: true,
-          email: true,
-          avatar: true,
-          address: true,
-          phone_number: true,
-          type: true,
-          gender: true,
-          date_of_birth: true,
-          created_at: true,
-        },
-      });
+async me(userId: string) {
+  try {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        avatar: true,
+        address: true,
+        phone_number: true,
+        type: true,
+        gender: true,
+        date_of_birth: true,
+        created_at: true,
+      },
+    });
 
-      if (!user) {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-
-      if (user.avatar) {
-        user['avatar_url'] = SojebStorage.url(
-          appConfig().storageUrl.avatar + user.avatar,
-        );
-      }
-
-      if (user) {
-        return {
-          success: true,
-          data: user,
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+    if (!user) {
+      return { success: false, message: 'User not found' };
     }
+
+    const pointsResult = await new DigsService(this.prisma).getPointsdict(userId);
+    const xp = pointsResult?.data || 0;
+
+    const userData = { ...user, xp };
+
+    if (user.avatar) {
+      userData['avatar_url'] = SojebStorage.url(
+        appConfig().storageUrl.avatar + user.avatar,
+      );
+    }
+
+    return { success: true, data: userData };
+  } catch (error) {
+    return { success: false, message: error.message };
   }
+}
+
 
   async updateUser(
     userId: string,
