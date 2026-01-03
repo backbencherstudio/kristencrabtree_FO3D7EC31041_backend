@@ -736,12 +736,15 @@ model Digs {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  title      String
+  title String
 
   user_id String?
-  user    User?    @relation(fields: [user_id], references: [id])
+  user    User?   @relation(fields: [user_id], references: [id])
 
-  layers Layers[]
+  layers       Layers[]
+  digResponses DigResponse[]
+
+  @@map("digs")
 }
 
 enum Type {
@@ -766,8 +769,24 @@ model Layers {
   point         Int?
   question      String?
 
-  options       String[]
-  other         Boolean?
-  other_text    String?
-  text          String?
+  options      String[]
+  other        Boolean?
+  other_text   String?
+  text         String?
+  digResponses DigResponse[]
+
+  @@map("layers")
+}
+
+model DigResponse {
+  id         String   @id @default(cuid())
+  dig_id     String
+  user_id    String
+  layer_id   String
+  response   String?
+  is_correct Boolean?
+  created_at DateTime @default(now())
+
+  dig   Digs   @relation(fields: [dig_id], references: [id])
+  layer Layers @relation(fields: [layer_id], references: [id])
 }
