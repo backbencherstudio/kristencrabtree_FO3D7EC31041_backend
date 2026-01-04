@@ -172,12 +172,20 @@ export class DigsService {
   async getPointsdict(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) return { success: false, message: 'Dig not found' };
+      if (!user) return { success: false, message: 'User not found' };
 
       const answeredOrNot = await this.prisma.digResponse.findMany({
         where: { user_id: userId },
         select: { dig_id: true, layer_id: true, response: true },
       });
+
+      if (answeredOrNot.length === 0) {
+        return {
+          success: true,
+          message: 'No digs attempted',
+          data: 0,
+        };
+      }
 
       const getAnsDigsLayerPoints = await this.prisma.layers.findMany({
         where: { dig_id: answeredOrNot[0].dig_id },
@@ -197,6 +205,7 @@ export class DigsService {
         data: totalpointsForCurrentuser,
       };
     } catch (error) {
+      console.error(error);
       throw error;
     }
   }
@@ -235,8 +244,7 @@ export class DigsService {
         where: { dig_id: digId },
       });
       return { success: true, data: responses };
-    }
-    catch (error) {
+    } catch (error) {
       return {
         success: false,
         message: 'Error retrieving dig responses',
