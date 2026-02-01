@@ -39,6 +39,8 @@ export class SeedCommand extends CommandRunner {
     // system admin, user id: 1
     const systemUser = await UserRepository.createSuAdminUser({
       username: appConfig().defaultUser.system.username,
+      // email: 'admin@example.com',
+      // password: '12356',
       email: appConfig().defaultUser.system.email,
       password: appConfig().defaultUser.system.password,
     });

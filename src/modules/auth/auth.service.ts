@@ -224,6 +224,7 @@ export class AuthService {
   async login({ email, userId }) {
     try {
       const payload = { email: email, sub: userId };
+      console.log("user::>>", payload)
 
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
@@ -237,6 +238,7 @@ export class AuthService {
         'EX',
         60 * 60 * 24 * 7, // 7 days in seconds
       );
+
 
       return {
         success: true,
