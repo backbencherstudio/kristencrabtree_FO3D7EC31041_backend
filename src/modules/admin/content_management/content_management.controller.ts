@@ -69,6 +69,12 @@ export class ContentManagementController {
     return this.contentManagementService.findAllMeditations(userId);
   }
 
+   // @UseGuards(JwtAuthGuard)
+  @Get('medi/:id')
+  async getSingleMeditation(@Param('id') id:string){
+    return await this.contentManagementService.getOneMeditation(id)
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('favorite-meditations')
   getFavoriteMeditations(@Req() req: any) {
@@ -125,7 +131,7 @@ export class ContentManagementController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Delete(':id')
+  @Delete('medi/:id')
   remove(@Param('id') id: string, @Req() req:any) {
     const userId = req.user.userId;
     return this.contentManagementService.remove(userId,id);

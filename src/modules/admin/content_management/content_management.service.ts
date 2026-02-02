@@ -165,52 +165,50 @@ export class ContentManagementService {
     };
   }
   async addListener(userId: string, meditationId: string) {
-  try {
-
-    const user = await this.prisma.user.findUnique({
-      where:{
-        id:userId
-      }
-    })
-    if(!user){
-       return {
-        success: false,
-        message: "No user found",
-      };
-    }
-    const checkAlready = await this.prisma.meditationListener.findUnique({
-      where: {
-        userId_meditationId: {
-          userId: userId,
-          meditationId: meditationId,
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
         },
-      },
-    });
+      });
+      if (!user) {
+        return {
+          success: false,
+          message: 'No user found',
+        };
+      }
+      const checkAlready = await this.prisma.meditationListener.findUnique({
+        where: {
+          userId_meditationId: {
+            userId: userId,
+            meditationId: meditationId,
+          },
+        },
+      });
 
-    if (checkAlready) {
+      if (checkAlready) {
+        return {
+          success: false,
+          message: 'Already a listener',
+        };
+      }
+
+      await this.prisma.meditationListener.create({
+        data: {
+          userId,
+          meditationId,
+        },
+      });
+
       return {
-        success: false,
-        message: "Already a listener",
+        success: true,
+        message: 'Added listener successfully',
+        liked: true,
       };
+    } catch (error) {
+      throw error;
     }
-
-    await this.prisma.meditationListener.create({
-      data: {
-        userId,
-        meditationId,
-      },
-    });
-
-    return {
-      success: true,
-      message: "Added listener successfully",
-      liked: true,
-    };
-  } catch (error) {
-    throw error;
   }
-}
-
 
   async addFavoriteMeditation(userId: string, meditationId: string) {
     try {
@@ -288,8 +286,55 @@ export class ContentManagementService {
       throw error;
     }
   }
-  remove(userid: string, id: string) {
-    return `This action removes a #${id} contentManagement`;
+
+  async getOneMeditation(id) {
+    const meditation = await this.prisma.meditation.findFirst({
+      where: {
+        id: id,
+      },
+    });
+    if (!meditation) {
+      return {
+        success: false,
+        message: 'Meditation not found',
+      };
+    }
+    if (meditation.meditation_audio) {
+      meditation['meditation_audio'] = SojebStorage.url(
+        appConfig().storageUrl.audio + meditation.meditation_audio,
+      );
+    }
+    return {
+      success: true,
+      message: 'Meditation fetch successfull',
+      data: meditation,
+    };
+  }
+
+  async remove(userid: string, id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userid,
+      },
+    });
+    if (user) {
+      if (user.type === 'admin') {
+        await this.prisma.meditation.delete({
+          where: {
+            id: id,
+          },
+        });
+      } else {
+        return {
+          success: false,
+          message: 'User not found or ou dont have permission to delete the meditation',
+        };
+      }
+    }
+    return {
+      success:true,
+      message:"Deletation of meditation successfull"
+    };
   }
   //Meditations management end
 

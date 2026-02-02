@@ -35,23 +35,46 @@ export class SeedCommand extends CommandRunner {
   }
 
   //---- user section ----
-  async userSeed() {
-    // system admin, user id: 1
-    const systemUser = await UserRepository.createSuAdminUser({
-      username: appConfig().defaultUser.system.username,
-      // email: 'admin@example.com',
-      // password: '12356',
-      email: appConfig().defaultUser.system.email,
-      password: appConfig().defaultUser.system.password,
-    });
+  // async userSeed() {
+  //   // system admin, user id: 1
+  //   const systemUser = await UserRepository.createSuAdminUser({
+  //     username: appConfig().defaultUser.system.username,
+  //     email: appConfig().defaultUser.system.email,
+  //     password: appConfig().defaultUser.system.password,
+  //   });
 
-    await this.prisma.roleUser.create({
-      data: {
-        user_id: systemUser.id,
-        role_id: '1',
-      },
-    });
-  }
+  //   await this.prisma.roleUser.create({
+  //     data: {
+  //       user_id: systemUser.id,
+  //       role_id: '1',
+  //     },
+  //   });
+  // }
+
+  async userSeed() {
+  console.log('Creating system user with email:', appConfig().defaultUser.system.email);
+  
+  // Direct create instead of using UserRepository
+  const systemUser = await this.prisma.user.create({
+    data: {
+      username: appConfig().defaultUser.system.username,
+      email: appConfig().defaultUser.system.email,
+      password: appConfig().defaultUser.system.password, // NOTE: Should be hashed!
+      // Add any other required fields from your Prisma schema
+    },
+  });
+
+  console.log('System user created with ID:', systemUser.id);
+
+  await this.prisma.roleUser.create({
+    data: {
+      user_id: systemUser.id,
+      role_id: '1',
+    },
+  });
+  
+  console.log('Role assigned to user');
+}
 
   async permissionSeed() {
     let i = 0;
