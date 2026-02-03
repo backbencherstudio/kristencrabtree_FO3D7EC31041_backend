@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateDigDto, SaveResponseItemDto } from './dto/create-dig.dto';
 import { UpdateDigDto } from './dto/update-dig.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -265,5 +265,32 @@ export class DigsService {
     } catch (error) {
       throw error;
     }
+  }
+  async updateDig(id,userId,updateDig){
+
+    const user=await this.prisma.user.findFirst({
+      where:{
+        id:userId
+      }
+    })
+    if(!user){
+      throw new NotFoundException("User not found")
+    }
+
+    const updated=await this.prisma.digs.update({
+      where:{
+        id:id
+      },
+      data:{
+        ...updateDig
+      }
+    })
+
+    return {
+      success:true,
+      message:"Dig Update Successful",
+      updated
+    }
+
   }
 }

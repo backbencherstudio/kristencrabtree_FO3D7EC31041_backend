@@ -67,6 +67,7 @@ export class JournelsService {
       throw error;
     }
   }
+  
   // async findAll(userId:string) {
   //   try {
 
@@ -155,11 +156,18 @@ export class JournelsService {
         };
       }
 
+      journals.forEach(item=>{
+        if(item.audio){
+          item['audio']=SojebStorage.url(
+            appConfig().storageUrl.audio+'/'+item.audio
+          )
+        }
+      })
+
       const result = journals.map(({ _count, likeJournels, ...journel }) => ({
         ...journel,
         likeCount: _count.likeJournels,
-        isLiked: likeJournels.length > 0,
-  
+        isLiked: likeJournels.length > 0,  
       }));
 
       return {
@@ -171,6 +179,7 @@ export class JournelsService {
       throw error;
     }
   }
+
   async getRecommendedJournals(userId: string) {
     const journals = await this.prisma.journel.findMany({
       where: {
@@ -188,6 +197,7 @@ export class JournelsService {
       data: journals,
     };
   }
+
   async getPersonalJournals(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -226,6 +236,7 @@ export class JournelsService {
       throw error;
     }
   }
+
   async findOne(user_id: string, id: string) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -238,7 +249,11 @@ export class JournelsService {
       const journel = await this.prisma.journel.findUnique({
         where: { id, user_id },
       });
-
+      if(journel.audio){
+          journel['audio']=SojebStorage.url(
+            appConfig().storageUrl.audio+'/'+journel.audio
+          )
+        }
       return {
         success: true,
         message: 'Journel retrieved successfully',
@@ -248,6 +263,7 @@ export class JournelsService {
       throw error;
     }
   }
+
   async toggleLike(userId: string, journelId: string) {
     try {
       await this.prisma.likeJournel.create({
@@ -276,6 +292,7 @@ export class JournelsService {
       };
     }
   }
+
   async update(
     user_id: string,
     id: string,
@@ -352,6 +369,7 @@ export class JournelsService {
       throw error;
     }
   }
+
   async remove(user_id: string, id: string) {
     try {
       const user = await this.prisma.user.findUnique({

@@ -5,6 +5,11 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { StringHelper } from 'src/common/helper/string.helper';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import appConfig from 'src/config/app.config';
+import * as ffmpeg from 'fluent-ffmpeg';
+import * as ffprobeStatic from 'ffprobe-static';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 
 @Injectable()
 export class ContentManagementService {
@@ -37,10 +42,54 @@ export class ContentManagementService {
 
     const fileName = `${StringHelper.randomString()}-${audio.originalname}`;
 
+    // Upload to storage
     await SojebStorage.put(
       appConfig().storageUrl.audio + fileName,
       audio.buffer,
     );
+    // Extract duration via temporary file
+    let durationSeconds: number | null = null;
+    let tempFilePath: string | null = null;
+
+    try {
+      tempFilePath = path.join(
+        os.tmpdir(),
+        `audio-probe-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
+      );
+
+      await fs.writeFile(tempFilePath, audio.buffer);
+
+      durationSeconds = await new Promise<number>((resolve, reject) => {
+        ffmpeg.ffprobe(tempFilePath, (err, metadata) => {
+          if (err) {
+            return reject(err);
+          }
+          const duration = metadata.format?.duration;
+          if (typeof duration === 'number' && !isNaN(duration) && duration > 0) {
+            resolve(duration);
+          } else {
+            reject(new Error('Duration not found or invalid in metadata'));
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Failed to extract audio duration:', error);
+    } finally {
+      if (tempFilePath) {
+        try {
+          await fs.unlink(tempFilePath);
+        } catch (cleanupErr) {
+          console.warn('Failed to clean up temp file:', cleanupErr);
+        }
+      }
+    }
+
+    // Format duration string
+    let durationInString: string | null = null;
+    if (durationSeconds && durationSeconds > 0) {
+      const minutes = Math.round(durationSeconds / 60);
+      durationInString = `${minutes} minutes`;
+    }
 
     const newMeditation = await this.prisma.meditation.create({
       data: {
@@ -48,15 +97,24 @@ export class ContentManagementService {
         meditation_description:
           createContentManagementDto.meditation_description,
         meditation_audio: fileName,
+        duration: durationInString || null, 
       },
     });
+
+    if(newMeditation.meditation_audio){
+      newMeditation['meditation_audio']=SojebStorage.url(
+        appConfig().storageUrl.audio + fileName
+      )
+    }
 
     return {
       success: true,
       message: 'Meditation created successfully',
       data: newMeditation,
     };
+  
   }
+  
   async findAllMeditations(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -256,6 +314,7 @@ export class ContentManagementService {
       throw error;
     }
   }
+
   async getFavoriteMeditations(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -327,13 +386,14 @@ export class ContentManagementService {
       } else {
         return {
           success: false,
-          message: 'User not found or ou dont have permission to delete the meditation',
+          message:
+            'User not found or you dont have permission to delete the meditation',
         };
       }
     }
     return {
-      success:true,
-      message:"Deletation of meditation successfull"
+      success: true,
+      message: 'Deletation of meditation successfull',
     };
   }
   //Meditations management end

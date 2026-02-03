@@ -697,6 +697,7 @@ model Meditation {
   meditation_name        String?
   meditation_description String?
   meditation_audio       String?
+  duration String?
 
   listeners           MeditationListener[]
   favoriteMeditations favoriteMeditation[]
