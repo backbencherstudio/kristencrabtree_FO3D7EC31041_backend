@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateDigDto, SaveResponseItemDto } from './dto/create-dig.dto';
 import { UpdateDigDto } from './dto/update-dig.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -62,6 +66,7 @@ export class DigsService {
       };
     }
   }
+
   async saveUserResponses(
     userId: string,
     digId: string,
@@ -169,6 +174,7 @@ export class DigsService {
       };
     }
   }
+
   async getPointsdict(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -209,6 +215,7 @@ export class DigsService {
       throw error;
     }
   }
+
   async getAlldigs(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -238,6 +245,7 @@ export class DigsService {
       throw error;
     }
   }
+
   async getDigResponses(digId: string) {
     try {
       const responses = await this.prisma.digResponse.findMany({
@@ -252,6 +260,7 @@ export class DigsService {
       };
     }
   }
+  
   async getSingleDig(digId: string) {
     try {
       const dig = await this.prisma.digs.findUnique({
@@ -266,31 +275,44 @@ export class DigsService {
       throw error;
     }
   }
-  async updateDig(id,userId,updateDig){
 
-    const user=await this.prisma.user.findFirst({
-      where:{
-        id:userId
-      }
-    })
-    if(!user){
-      throw new NotFoundException("User not found")
+  async updateDig(id, userId, updateDig) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    const updated=await this.prisma.digs.update({
-      where:{
-        id:id
+    const updated = await this.prisma.digs.update({
+      where: {
+        id,
       },
-      data:{
-        ...updateDig
-      }
-    })
+      data: {
+        title: updateDig.title,
+        layers: {
+          deleteMany: {}, // delete existing layers
+          create: updateDig.layers?.map((layer) => ({
+            question_name: layer.question_name,
+            question_type: layer.question_type,
+            point: layer.point,
+            question: layer.question,
+            options: layer.options,
+            other: layer.other,
+            other_text: layer.other_text,
+            text: layer.text,
+          })),
+        },
+      },
+    });
 
     return {
-      success:true,
-      message:"Dig Update Successful",
-      updated
-    }
-
+      success: true,
+      message: 'Dig Update Successful',
+      updated,
+    };
   }
+
 }

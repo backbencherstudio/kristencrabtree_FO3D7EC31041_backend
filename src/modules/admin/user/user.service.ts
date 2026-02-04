@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -36,12 +41,14 @@ export class UserService {
 
   async findAll({
     q,
-    type,
+    status,
     approved,
+    joined,
   }: {
     q?: string;
-    type?: string;
+    status?: string;
     approved?: string;
+    joined?: string;
   }) {
     try {
       const where_condition = {};
@@ -52,18 +59,28 @@ export class UserService {
         ];
       }
 
-      if (type) {
-        where_condition['type'] = type;
+      if (status) {
+        where_condition['status'] = parseInt(status);
       }
 
       if (approved) {
         where_condition['approved_at'] =
           approved == 'approved' ? { not: null } : { equals: null };
       }
+      if (joined) {
+        const start = new Date(`${joined}T00:00:00.000Z`);
+        const end = new Date(`${joined}T23:59:59.999Z`);
+
+        where_condition['created_at'] = {
+          gte: start,
+          lte: end,
+        };
+      }
 
       const users = await this.prisma.user.findMany({
         where: {
           ...where_condition,
+          type: 'user',
         },
         select: {
           id: true,
@@ -72,6 +89,7 @@ export class UserService {
           phone_number: true,
           address: true,
           type: true,
+          status: true,
           approved_at: true,
           created_at: true,
           updated_at: true,
@@ -223,5 +241,37 @@ export class UserService {
         message: error.message,
       };
     }
+  }
+
+  async userAction(id: string, actionDto: { status?: number }) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (actionDto.status === undefined) {
+      throw new BadRequestException('Status is required');
+    }
+
+    if (user.status === actionDto.status) {
+      throw new BadRequestException(
+        'You cannot update the user with the same status',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        status: actionDto.status,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'User status updated successfully',
+    };
   }
 }

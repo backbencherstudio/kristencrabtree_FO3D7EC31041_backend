@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import Redis from 'ioredis';
-
 //internal imports
 import { DateHelper } from '../../common/helper/date.helper';
 import { StringHelper } from '../../common/helper/string.helper';
@@ -22,7 +21,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 import { DigsService } from '../admin/digs/digs.service';
-import e from 'express';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -141,6 +140,36 @@ export class AuthService {
         data.avatar = fileName;
       }
       const user = await UserRepository.getUserDetails(userId);
+      if (
+        updateUserDto.current_password &&
+        updateUserDto.new_password &&
+        updateUserDto.confirm_password
+      ) {
+        if (updateUserDto.new_password !== updateUserDto.confirm_password) {
+          throw new BadRequestException(
+            'New password and confirm password do not match',
+          );
+        }
+
+        // Compare the current password with the hashed password in the database
+        const isCurrentPasswordValid = await bcrypt.compare(
+          updateUserDto.current_password,
+          user.password,
+        );
+
+        if (!isCurrentPasswordValid) {
+          throw new BadRequestException('Current password is incorrect');
+        }
+
+        // Hash the new password before saving it
+        const hashedNewPassword = await bcrypt.hash(
+          updateUserDto.new_password,
+          appConfig().security.salt,
+        );
+
+        // Add the hashed new password to the data object
+        data.password = hashedNewPassword;
+      }
       if (user) {
         await this.prisma.user.update({
           where: { id: userId },
@@ -224,7 +253,6 @@ export class AuthService {
   async login({ email, userId }) {
     try {
       const payload = { email: email, sub: userId };
-      console.log("user::>>", payload)
 
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
@@ -238,7 +266,6 @@ export class AuthService {
         'EX',
         60 * 60 * 24 * 7, // 7 days in seconds
       );
-
 
       return {
         success: true,
