@@ -96,6 +96,7 @@ model User {
   favoriteMeditations  favoriteMeditation[]
   layers               Layers[]
   digs                 Digs[]
+  userSubscription     UserSubscription[]
 
   @@map("users")
 }
@@ -137,7 +138,7 @@ model UserPreferences {
   updated_at DateTime  @default(now())
   deleted_at DateTime?
 
-  user_id            String?
+  user_id            String?              @unique
   user               User?                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   content_preference Content_Preference[]
 
@@ -147,7 +148,7 @@ model UserPreferences {
   communityDiscussions Frequency?
   journalPrompts       Frequency?
   scientificInsights   Frequency?
-  focus_area           Focus_Area?
+  focus_area           Focus_Area[]
   weekly_practice      Weekly_Practice?
 
   @@map("user_preferences")
@@ -170,6 +171,20 @@ model Plans {
   features    String[]
 
   @@map("plans")
+}
+
+model UserSubscription {
+  id     String  @id @default(cuid())
+  userId String? @unique
+  stripeSubscriptionId String?   @unique   
+
+  paymentTransactions PaymentTransaction[]
+  planName String?
+  planId String?
+  description String[]
+  allowedPermissions String[]
+  timesRenewed Int?
+  user   User?   @relation(fields: [userId], references: [id])
 }
 
 model Ucode {
@@ -332,6 +347,8 @@ model PaymentTransaction {
   currency         String?
   paid_amount      Decimal?
   paid_currency    String?
+  subscriptionId String?
+  subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@map("payment_transactions")
 }
@@ -697,7 +714,7 @@ model Meditation {
   meditation_name        String?
   meditation_description String?
   meditation_audio       String?
-  duration String?
+  duration               String?
 
   listeners           MeditationListener[]
   favoriteMeditations favoriteMeditation[]

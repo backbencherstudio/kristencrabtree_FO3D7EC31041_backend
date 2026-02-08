@@ -494,19 +494,48 @@ export class AuthService {
     }
   }
 
-  async updateUserPreferences(
-    userPrefId: string,
-    updateUserPreferencesDto: UserPreferencesDto,
-  ) {
+  async updateUserPreferences(userId: string, dto: UserPreferencesDto) {
     try {
-      // chcking the id
-      if (!userPrefId) {
+      if (!userId) {
         return {
           success: false,
-          message: 'id is missing',
+          message: 'User id is missing',
         };
       }
-      const requiredFields = [
+      const userPref = await this.prisma.userPreferences.findFirst({
+        where: { user_id: userId },
+      });
+
+      if (!userPref) {
+        await this.prisma.userPreferences.create({
+        data: {
+          content_preference: dto.content_preference,
+          dailyWisdomQuotes: dto.dailyWisdomQuotes,
+          guidedExercises: dto.guidedExercises,
+          meditationContent: dto.meditationContent,
+          communityDiscussions: dto.communityDiscussions,
+          journalPrompts: dto.journalPrompts,
+          scientificInsights: dto.scientificInsights,
+          focus_area: { set: dto.focus_area },
+          weekly_practice: dto.weekly_practice,
+        },
+      });
+      return {
+        success: true,
+        message: 'User preferences created successfully',
+      };
+      }
+      // if (
+      //   userPref.content_preference?.length &&
+      //   userPref.dailyWisdomQuotes !== null
+      // ) {
+      //   return {
+      //     success: false,
+      //     message: 'User preferences already set',
+      //   };
+      // }
+
+      const requiredFields: (keyof UserPreferencesDto)[] = [
         'content_preference',
         'dailyWisdomQuotes',
         'guidedExercises',
@@ -517,71 +546,38 @@ export class AuthService {
         'focus_area',
         'weekly_practice',
       ];
-      const checkUserPref = await this.prisma.userPreferences.findUnique({
-        where: { id: userPrefId },
-        select: {
-          id: true,
-          content_preference: true,
-          dailyWisdomQuotes: true,
-          guidedExercises: true,
-          meditationContent: true,
-          communityDiscussions: true,
-          journalPrompts: true,
-          scientificInsights: true,
-          focus_area: true,
-          weekly_practice: true,
-        },
-      });
-      // if already has data
-      if (
-        checkUserPref.communityDiscussions &&
-        checkUserPref.content_preference
-      ) {
-        return {
-          success: false,
-          message: 'User preferences already set',
-        };
-      }
-      if (!checkUserPref) {
-        return {
-          success: false,
-          message: 'User preferences not found',
-        };
-      }
-      const importantFields = requiredFields.filter(
-        (field) =>
-          updateUserPreferencesDto[field as keyof UserPreferencesDto] ===
-            undefined ||
-          updateUserPreferencesDto[field as keyof UserPreferencesDto] === null,
-      );
-      if (importantFields.length > 0) {
-        return {
-          success: false,
-          message: `Missing required data`,
-        };
-      }
-      // update user preferences
-      await this.prisma.userPreferences.update({
-        where: { id: userPrefId },
-        data: {
-          content_preference: updateUserPreferencesDto.content_preference,
-          dailyWisdomQuotes: updateUserPreferencesDto.dailyWisdomQuotes,
-          guidedExercises: updateUserPreferencesDto.guidedExercises,
-          meditationContent: updateUserPreferencesDto.meditationContent,
-          communityDiscussions: updateUserPreferencesDto.communityDiscussions,
-          journalPrompts: updateUserPreferencesDto.journalPrompts,
-          scientificInsights: updateUserPreferencesDto.scientificInsights,
-          focus_area: updateUserPreferencesDto.focus_area,
-          weekly_practice: updateUserPreferencesDto.weekly_practice,
-        },
-      });
 
+      const missingFields = requiredFields.filter(
+        (field) => dto[field] === undefined || dto[field] === null,
+      );
+
+      if (missingFields.length > 0) {
+        return {
+          success: false,
+          message: `Missing required fields: ${missingFields.join(', ')}`,
+        };
+      }
+      await this.prisma.userPreferences.update({
+        where: { user_id: userId },
+        data: {
+          content_preference: dto.content_preference,
+          dailyWisdomQuotes: dto.dailyWisdomQuotes,
+          guidedExercises: dto.guidedExercises,
+          meditationContent: dto.meditationContent,
+          communityDiscussions: dto.communityDiscussions,
+          journalPrompts: dto.journalPrompts,
+          scientificInsights: dto.scientificInsights,
+          focus_area: { set: dto.focus_area },
+          weekly_practice: dto.weekly_practice,
+        },
+      });
       return {
         success: true,
         message: 'User preferences updated successfully',
       };
     } catch (error: any) {
       console.error('Error updating user preferences:', error);
+
       return {
         success: false,
         message: 'Failed to update user preferences',

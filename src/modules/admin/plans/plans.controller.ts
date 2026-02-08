@@ -1,7 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 
 @Controller('plans')
 export class PlansController {
@@ -12,10 +23,24 @@ export class PlansController {
   //   return this.plansService.create(createPlanDto);
   // }
 
-  // @Get()
-  // findAll() {
-  //   return this.plansService.findAll();
-  // }
+  @Get()
+  async findAll() {
+    return this.plansService.getPlans();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('checkout')
+  async checkout(
+    @Body() body: { planId: string; confirmed?: boolean },
+    @Req() req: any,
+  ) {
+    const userId = req.user.userId;
+    const { planId, confirmed } = body;
+
+    console.log('🔥 Controller received:', { planId, confirmed });
+
+    return this.plansService.checkoutSession(userId, planId, confirmed);
+  }
 
   // @Get(':id')
   // findOne(@Param('id') id: string) {

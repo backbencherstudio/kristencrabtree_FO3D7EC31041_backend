@@ -117,7 +117,7 @@ export class AuthController {
   @Post('userPreff')
   async updateUserPreff(@Req() req: Request, @Body() body: any) {
     try {
-      const preffId = req.user.userPrefId;
+      const preffId = req.user.userId;
       return this.authService.updateUserPreferences(preffId, body);
     } catch (error) {}
   }

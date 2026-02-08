@@ -2,10 +2,14 @@ import { Controller, Post, Req, Headers } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import { Request } from 'express';
 import { TransactionRepository } from '../../../common/repository/transaction/transaction.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('payment/stripe')
 export class StripeController {
-  constructor(private readonly stripeService: StripeService) {}
+  constructor(
+    private readonly stripeService: StripeService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('webhook')
   async handleWebhook(
@@ -13,7 +17,7 @@ export class StripeController {
     @Req() req: Request,
   ) {
     try {
-      const payload = req.rawBody.toString();
+      const payload = req.rawBody;
       const event = await this.stripeService.handleWebhook(payload, signature);
 
       // Handle events
@@ -37,6 +41,27 @@ export class StripeController {
             raw_status: paymentIntent.status,
           });
           break;
+        case 'invoice.payment_succeeded':
+          const invoice = event.data.object as any;
+
+          // Ignore the first invoice (subscription creation)
+          if (invoice.billing_reason !== 'subscription_cycle') {
+            return;
+          }
+
+          const subscriptionId = invoice.subscription as string;
+
+          const sub = await this.prisma.userSubscription.findFirst({
+            where: { stripeSubscriptionId: subscriptionId },
+          });
+
+          if (sub) {
+            await this.prisma.userSubscription.update({
+              where: { id: sub.id },
+              data: { timesRenewed: { increment: 1 } },
+            });
+          }
+
         case 'payment_intent.payment_failed':
           const failedPaymentIntent = event.data.object;
           // Update transaction status in database
@@ -80,5 +105,18 @@ export class StripeController {
       console.error('Webhook error', error);
       return { received: false };
     }
+  }
+
+  async handleSubscriptionRenewal(subscriptionId: string) {
+    await this.prisma.userSubscription.update({
+      where: {
+        stripeSubscriptionId: subscriptionId,
+      },
+      data: {
+        timesRenewed: {
+          increment: 1,
+        },
+      },
+    });
   }
 }
