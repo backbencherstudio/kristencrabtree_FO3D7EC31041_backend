@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Complete Payment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://js.stripe.com/v3/"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f3ec;
+      padding: 30px;
+    }
+    .container {
+      max-width: 420px;
+      background: #fffaf3;
+      padding: 24px;
+      border-radius: 12px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-top: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+    #card-element {
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      margin-top: 6px;
+      background: white;
+    }
+    .checkbox {
+      margin-top: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      border-radius: 25px;
+      background: #d9c08c;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #c7ad73;
+    }
+    pre {
+      margin-top: 20px;
+      background: #eee;
+      padding: 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Complete Payment</h2>
+
+  <label>Account Holder Name</label>
+  <input id="name" placeholder="Your Account Name" />
+
+  <label>Card Details</label>
+  <div id="card-element"></div>
+
+  <div class="checkbox">
+    <input type="checkbox" id="saveCard" checked />
+    <label for="saveCard">Save Card Information</label>
+  </div>
+
+  <button onclick="pay()">Pay Now</button>
+
+  <pre id="result"></pre>
+</div>
+
+<script>
+  const stripe = Stripe('pk_test_51SuVy8DV3llbsevupgRUphZizsRFVuhaLOIGl8ngNY2KiMHRAzw37MHwDjlpTs4GzPZCyzT5fWQH0ecLLKyfClYt00Y71SEIwc');
+  const elements = stripe.elements();
+  const card = elements.create('card');
+
+  localStorage.setItem(
+    'access_token',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlc3RVc2VyMjNAZ21haWwuY29tIiwic3ViIjoiY21sZGR0ZWViMDAwNnY4ZWNpaHR5dWZmbiIsImlhdCI6MTc3MDUzMzM5OSwiZXhwIjoxNzcwNTM2OTk5fQ.a9_TwrEMh88VgWXArVJkcxiLM467VDW77JYcgYsLEyA'
+  );
+
+  card.mount('#card-element');
+
+  async function pay() {
+    try {
+      console.log('🟢 PAY BUTTON CLICKED');
+
+      const token = localStorage.getItem('access_token');
+      console.log('🟢 TOKEN FOUND:', !!token);
+
+      const planId = 'price_1Sy9EmDV3llbsevuISdDagRY';
+
+      // 🟢 STEP 1 — First call (get SetupIntent)
+      console.log('🟢 STEP 1: Calling checkout (no confirmed)');
+
+      const res1 = await fetch('http://localhost:4020/api/plans/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planId }),
+      });
+
+      console.log('🟢 STEP 1: Response status', res1.status);
+
+      const data1 = await res1.json();
+      console.log('🟢 STEP 1: Response body', data1);
+
+      if (data1.step !== 'SETUP_INTENT') {
+        throw new Error('Expected SetupIntent');
+      }
+
+      // 🟢 STEP 2 — Confirm card
+      console.log('🟢 STEP 2: Calling stripe.confirmCardSetup');
+
+      const setupResult = await stripe.confirmCardSetup(
+        data1.clientSecret,
+        {
+          payment_method: {
+            card,
+            billing_details: {
+              name: document.getElementById('name').value,
+            },
+          },
+        }
+      );
+
+      console.log('🟢 STEP 2: confirmCardSetup result', setupResult);
+
+      if (setupResult.error) throw setupResult.error;
+
+      console.log(
+        '🟢 STEP 2: SetupIntent status',
+        setupResult.setupIntent?.status
+      );
+
+      // 🟢 STEP 3 — Second call (create subscription)
+      console.log('🟢 STEP 3: Calling checkout with confirmed=true');
+
+      const res2 = await fetch('http://localhost:4020/api/plans/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planId,
+          confirmed: true,
+        }),
+      });
+
+      console.log('🟢 STEP 3: Response status', res2.status);
+
+      const data2 = await res2.json();
+      console.log('🟢 STEP 3: Response body', data2);
+
+      document.getElementById('result').textContent =
+        JSON.stringify(data2, null, 2);
+
+    } catch (err) {
+      console.error('🔴 ERROR CAUGHT', err);
+      document.getElementById('result').textContent =
+        'Error: ' + err.message;
+    }
+  }
+</script>
+
+</body>
+</html>
