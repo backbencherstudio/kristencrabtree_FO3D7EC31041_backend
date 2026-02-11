@@ -77,3 +77,17 @@ export function formatPercentageChange(
   }
 
 
+  export function getMonthRangeByYear(year: number, month: number) {
+  const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+
+  return { start, end };
+}
+
+export function isPremiumUser(subscriptionValidUntil?: string | null): boolean {
+  if (!subscriptionValidUntil) return false;
+
+  const expiryMs = Number(subscriptionValidUntil) * 1000; // epoch → ms
+  return expiryMs > Date.now();
+}
+

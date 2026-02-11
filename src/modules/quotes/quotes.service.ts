@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -10,21 +10,18 @@ export class QuotesService {
       const user = await this.prisma.user.findUnique({
         where: { id: user_id },
       });
-
       if (!user) {
         return {
           success: false,
           message: 'User not found',
         };
       }
-
       const newQuote = await this.prisma.quote.create({
         data: {
           ...createQuoteDto,
           user_id,
         },
       });
-
       return {
         success: true,
         message: 'Quote created successfully',
@@ -38,10 +35,10 @@ export class QuotesService {
       };
     }
   }
-  async findAll(user_id: string) {
+  async findAll(userId) {
     try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: user_id, type: 'user' },
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId },
       });
 
       if (!user) {
@@ -50,9 +47,8 @@ export class QuotesService {
           message: 'User not found',
         };
       }
-
       const quotes = await this.prisma.quote.findMany({
-        where: { user_id },
+        where: { user_id: userId },
       });
 
       if (quotes.length === 0) {
@@ -79,7 +75,7 @@ export class QuotesService {
   async findOne(id: string, user_id: string) {
     try {
       const quote = await this.prisma.quote.findFirst({
-        where: { id, user_id },
+        where: { id },
         select: {
           id: true,
           quote_author: true,
@@ -108,6 +104,28 @@ export class QuotesService {
         error: error.message || error,
       };
     }
+  }
+  async updateQuote(id, dto) {
+    console.log(id);
+    const quote = await this.prisma.quote.findFirst({
+      where: {
+        id: id,
+      },
+    });
+    if (!quote) throw new NotFoundException('Quote not found');
+
+    const updated = await this.prisma.quote.update({
+      where: {
+        id: id,
+      },
+      data: {
+        ...dto,
+      },
+    });
+    return {
+      success: true,
+      message: 'Updated Success',
+    };
   }
   async remove(id: string, user_id: string) {
     try {

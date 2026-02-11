@@ -27,9 +27,9 @@ export class QuotesController {
   }
 
   @Get()
-  findAll(@Req() req: any) {
-    const userID = req.user?.userId;
-    return this.quotesService.findAll(userID);
+  findAll(@Req() req:any) {
+    const userId = req.user?.userId;
+    return this.quotesService.findAll(userId);
   }
 
   @Get('random')
@@ -50,6 +50,11 @@ export class QuotesController {
   addReaction(@Param('id') id: string, @Req() req: any) {
     const userID = req.user?.userId;
     return this.quotesService.reactToggle(id, userID);
+  }
+
+  @Patch('update/:id')
+  updateQuote(@Param('id') id:string,@Body() dto:UpdateQuoteDto){
+    return this.quotesService.updateQuote(id,dto)
   }
 
   @Delete(':id')

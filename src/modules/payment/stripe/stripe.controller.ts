@@ -20,6 +20,7 @@ export class StripeController {
       const payload = req.rawBody;
       const event = await this.stripeService.handleWebhook(payload, signature);
 
+      console.log(event.type);
       // Handle events
       switch (event.type) {
         case 'customer.created':
@@ -43,6 +44,12 @@ export class StripeController {
           break;
         case 'invoice.payment_succeeded':
           const invoice = event.data.object as any;
+          await this.prisma.user.update({
+            where: { email: invoice.customer_email },
+            data: {
+              subscriptionValidUntil: invoice.period_end.toString(),
+            },
+          });
 
           // Ignore the first invoice (subscription creation)
           if (invoice.billing_reason !== 'subscription_cycle') {

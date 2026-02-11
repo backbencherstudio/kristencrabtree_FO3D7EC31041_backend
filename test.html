@@ -131,7 +131,7 @@
       }
 
       // 🟢 STEP 2 — Confirm card
-      console.log('🟢 STEP 2: Calling stripe.confirmCardSetup');
+    //   console.log('🟢 STEP 2: Calling stripe.confirmCardSetup');
 
       const setupResult = await stripe.confirmCardSetup(
         data1.clientSecret,
@@ -145,17 +145,17 @@
         }
       );
 
-      console.log('🟢 STEP 2: confirmCardSetup result', setupResult);
+    //   console.log('🟢 STEP 2: confirmCardSetup result', setupResult);
 
       if (setupResult.error) throw setupResult.error;
 
-      console.log(
-        '🟢 STEP 2: SetupIntent status',
-        setupResult.setupIntent?.status
-      );
+    //   console.log(
+    //     '🟢 STEP 2: SetupIntent status',
+    //     setupResult.setupIntent?.status
+    //   );
 
       // 🟢 STEP 3 — Second call (create subscription)
-      console.log('🟢 STEP 3: Calling checkout with confirmed=true');
+    //   console.log('🟢 STEP 3: Calling checkout with confirmed=true');
 
       const res2 = await fetch('http://localhost:4020/api/plans/checkout', {
         method: 'POST',

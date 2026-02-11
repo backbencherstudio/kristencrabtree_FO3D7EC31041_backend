@@ -310,7 +310,7 @@ export class JournelsService {
       const journal = await this.prisma.journel.findUnique({
         where: { id },
       });
-      if (!journal || journal.user_id !== user_id) {
+      if (!journal) {
         return {
           success: false,
           message: 'Unauthorized to update this journal',

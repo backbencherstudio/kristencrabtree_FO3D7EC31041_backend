@@ -105,7 +105,7 @@ export class ContentManagementController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put('medi/:meditation_id')
+  @Patch('medi/:meditation_id')
   @UseInterceptors(FileInterceptor('audio'))
   async update(
     @Param('meditation_id') meditation_id: string,

@@ -37,8 +37,6 @@ export class PlansController {
     const userId = req.user.userId;
     const { planId, confirmed } = body;
 
-    console.log('🔥 Controller received:', { planId, confirmed });
-
     return this.plansService.checkoutSession(userId, planId, confirmed);
   }
 

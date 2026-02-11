@@ -66,16 +66,16 @@ model User {
   email_verified_at DateTime?
 
   is_agrred_to_terms_and_policy Boolean?
-  is_two_factor_enabled         Int?     @default(0)
+  is_two_factor_enabled         Int?           @default(0)
   two_factor_secret             String? // secret key for two factor authentication
-
-  accounts                  Account[]
-  creator_conversations     Conversation[] @relation("creator")
-  participant_conversations Conversation[] @relation("participant")
-  receiver_messages         Message[]      @relation("receiver")
-  sender_messages           Message[]      @relation("sender")
-  receiver_notifications    Notification[] @relation("receiver")
-  sender_notifications      Notification[] @relation("sender")
+  subscriptionValidUntil        String? // subscription valid until
+  accounts                      Account[]
+  creator_conversations         Conversation[] @relation("creator")
+  participant_conversations     Conversation[] @relation("participant")
+  receiver_messages             Message[]      @relation("receiver")
+  sender_messages               Message[]      @relation("sender")
+  receiver_notifications        Notification[] @relation("receiver")
+  sender_notifications          Notification[] @relation("sender")
 
   user_payment_methods UserPaymentMethod[]
   user_settings        UserSetting[]
@@ -174,19 +174,21 @@ model Plans {
 }
 
 model UserSubscription {
-  id     String  @id @default(cuid())
-  userId String? @unique
-  stripeSubscriptionId String?   @unique   
-  paymentTransactions PaymentTransaction[]
-  planName String?
-  planId String?
-  description String[]
-  allowedPermissions String[]
-  timesRenewed Int?
-  status String?
-  user   User?   @relation(fields: [userId], references: [id])
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id                   String               @id @default(cuid())
+  userId               String?              @unique
+  stripeSubscriptionId String?              @unique
+  paymentTransactions  PaymentTransaction[]
+  planName             String?
+  planId               String?
+  description          String[]
+  allowedPermissions   String[]
+  timesRenewed         Int?
+  status               String?
+  cardLast4            String?
+  method               String?
+  user                 User?                @relation(fields: [userId], references: [id])
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @default(now())
 }
 
 model Ucode {
@@ -339,18 +341,18 @@ model PaymentTransaction {
   user    User?   @relation(fields: [user_id], references: [id])
 
   order_id         String?
-  type             String?  @default("order")
-  withdraw_via     String?  @default("wallet")
+  type             String?           @default("order")
+  withdraw_via     String?           @default("wallet")
   provider         String?
   reference_number String?
-  status           String?  @default("pending")
+  status           String?           @default("pending")
   raw_status       String?
   amount           Decimal?
   currency         String?
   paid_amount      Decimal?
   paid_currency    String?
-  subscriptionId String?
-  subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId   String?
+  subscription     UserSubscription? @relation(fields: [subscriptionId], references: [id])
 
   @@map("payment_transactions")
 }

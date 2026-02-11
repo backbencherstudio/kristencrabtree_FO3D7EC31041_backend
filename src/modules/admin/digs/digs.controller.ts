@@ -13,7 +13,6 @@ import {
 import { DigsService } from './digs.service';
 import { CreateDigDto, SaveResponseDto } from './dto/create-dig.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
-import { User } from '../user/entities/user.entity';
 import { UpdateDigDto } from './dto/update-dig.dto';
 
 @Controller('admin/digs')
@@ -74,7 +73,7 @@ export class DigsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Patch('delete/:id')
+  @Delete('delete/:id')
   async deleteDig(
     @Param('id') id: string,
     @Req() req: any,

@@ -46,7 +46,7 @@ export class JournelsController {
     return this.journelsService.findAll(req.user.userId);
   }
   @UseGuards(JwtAuthGuard)
-  @Get('reccommended')
+  @Get('recommended')
   getRecommendedJournals(@Req() req: any) {
     const user_id = req.user?.userId;
     return this.journelsService.getRecommendedJournals(user_id);

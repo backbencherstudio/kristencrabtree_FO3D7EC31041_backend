@@ -5,7 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { join } from 'path';
-// import express from 'express';
+import express from 'express';
 // internal imports
 import { AppModule } from './app.module';
 import appConfig from './config/app.config';
@@ -13,6 +13,7 @@ import { CustomExceptionFilter } from './common/exception/custom-exception.filte
 import { SojebStorage } from './common/lib/Disk/SojebStorage';
 import * as path from 'path';
 async function bootstrap() {
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });

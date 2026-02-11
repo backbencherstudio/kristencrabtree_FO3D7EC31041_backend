@@ -6,7 +6,10 @@ import {
   getMonthRange,
   getLastNDaysRange,
   formatPercentageChange,
+  getMonthRangeByYear,
+  isPremiumUser,
 } from './helper.utils';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Injectable()
 export class DashboardService {
@@ -97,9 +100,9 @@ export class DashboardService {
     const thisMonthRev = Number(thisMonthR._sum.amount ?? 0);
     const lastMonthRev = Number(lastMonthR._sum.amount ?? 0);
 
-    const percentage = formatPercentageChange(lastMonthRev,thisMonthRev,2);
+    const percentage = formatPercentageChange(lastMonthRev, thisMonthRev, 2);
 
-    console.log(thisMonthRev, lastMonthR);
+    console.log(thisMonthRev, lastMonthRev);
 
     return {
       success: true,
@@ -116,6 +119,230 @@ export class DashboardService {
           revenue: totalRevenue,
           totalRevPercentage: percentage,
         },
+      },
+    };
+  }
+
+  async overview() {
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const lastYear = currentYear - 1;
+
+    const [currentYearData, lastYearData] = await Promise.all([
+      this.getMonthlyOverview(currentYear),
+      this.getMonthlyOverview(lastYear),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        currentYear: currentYearData,
+        lastYear: lastYearData,
+      },
+    };
+  }
+
+  private async getMonthlyOverview(year: number) {
+    const results = [];
+    const MONTHS = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    for (let month = 0; month < 12; month++) {
+      const { start, end } = getMonthRangeByYear(year, month);
+
+      const [users, subscriptions, revenueAgg] = await Promise.all([
+        this.prisma.user.findMany({
+          where: {
+            type: 'user',
+            created_at: { gte: start, lte: end },
+          },
+          select: {
+            subscriptionValidUntil: true,
+          },
+        }),
+
+        this.prisma.userSubscription.count({
+          where: {
+            status: 'active',
+            created_at: { gte: start, lte: end },
+          },
+        }),
+
+        this.prisma.paymentTransaction.aggregate({
+          _sum: { amount: true },
+          where: {
+            status: 'succeeded',
+            created_at: { gte: start, lte: end },
+          },
+        }),
+      ]);
+
+      // Split users into free vs premium
+      let premiumUsers = 0;
+      let freeUsers = 0;
+
+      for (const user of users) {
+        if (isPremiumUser(user.subscriptionValidUntil)) {
+          premiumUsers++;
+        } else {
+          freeUsers++;
+        }
+      }
+
+      results.push({
+        month: MONTHS[month],
+        users: users.length,
+        premiumUsers,
+        freeUsers,
+        activeSubscriptions: subscriptions,
+        revenue: Number(revenueAgg._sum.amount ?? 0),
+      });
+    }
+
+    return results;
+  }
+
+  async paymentOverview(
+    paginationDto: { page?: number; perPage?: number },
+    filters: { planName?: string; status?: string },
+  ) {
+    const whereClause: any = {};
+
+    if (filters.planName) {
+      whereClause.planName = {
+        equals: filters.planName,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filters.status) {
+      whereClause.status = {
+        equals: filters.status,
+        mode: 'insensitive',
+      };
+    }
+
+    const page =
+      Number(paginationDto?.page) > 0 ? Number(paginationDto.page) : 1;
+    const limit =
+      Number(paginationDto?.perPage) > 0 ? Number(paginationDto.perPage) : 10;
+
+    const skip = (page - 1) * limit;
+
+    const [total, subscriptions] = await this.prisma.$transaction([
+      this.prisma.userSubscription.count({
+        where: whereClause,
+      }),
+      this.prisma.userSubscription.findMany({
+        select: {
+          planName: true,
+          status: true,
+          updated_at: true,
+          cardLast4: true,
+          user: {
+            select: {
+              email: true,
+              first_name: true,
+            },
+          },
+        },
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: {
+          updated_at: 'desc',
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: subscriptions,
+      pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+      },
+    };
+  }
+
+  async paymentStats() {
+    const Revenue = await this.prisma.paymentTransaction.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'succeeded',
+      },
+    });
+    const totalRevenue = Revenue._sum.amount || 0;
+
+    //yearly revenue
+    const yearlySubs = await this.prisma.userSubscription.findMany({
+      where: {
+        status: 'active',
+        planName: 'Yearly',
+      },
+      select: {
+        paymentTransactions: {
+          where: {
+            status: 'succeeded', // VERY IMPORTANT
+          },
+          select: {
+            amount: true,
+          },
+        },
+      },
+    });
+
+    let yearlyRevenue = 0;
+    for (const sub of yearlySubs) {
+      for (const tx of sub.paymentTransactions) {
+        yearlyRevenue += Number(tx.amount ?? 0);
+      }
+    }
+
+    //monthly revenue
+    const monthlySubs = await this.prisma.userSubscription.findMany({
+      where: {
+        status: 'active',
+        planName: 'Monthly',
+      },
+      select: {
+        paymentTransactions: {
+          where: {
+            status: 'succeeded', // VERY IMPORTANT
+          },
+          select: {
+            amount: true,
+          },
+        },
+      },
+    });
+
+    let monthlyRevenue = 0;
+    for (const sub of monthlySubs) {
+      for (const tx of sub.paymentTransactions) {
+        monthlyRevenue += Number(tx.amount ?? 0);
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        total: totalRevenue,
+        yearly: yearlyRevenue.toString(),
+        monthly: monthlyRevenue.toString(),
       },
     };
   }
