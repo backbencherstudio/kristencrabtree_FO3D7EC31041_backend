@@ -10,6 +10,7 @@ import { UserPageModule } from './user_page/user_page.module';
 import { ContentManagementModule } from './content_management/content_management.module';
 import { DigsModule } from './digs/digs.module';
 // import { SubscriptionModule } from './subscription/subscription.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { DigsModule } from './digs/digs.module';
     UserPageModule,
     ContentManagementModule,
     DigsModule,
+    DashboardModule,
     // SubscriptionModule,
   ],
 })

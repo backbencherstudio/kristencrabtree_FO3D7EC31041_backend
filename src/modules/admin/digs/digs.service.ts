@@ -260,7 +260,7 @@ export class DigsService {
       };
     }
   }
-  
+
   async getSingleDig(digId: string) {
     try {
       const dig = await this.prisma.digs.findUnique({
@@ -315,4 +315,31 @@ export class DigsService {
     };
   }
 
+  async deleteDig(id, userId) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        type: 'admin',
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('Admin user not found');
+    }
+
+    const dig = await this.prisma.digs.findFirst({
+      where: {
+        id: id,
+      },
+    });
+    if (!dig) throw new NotFoundException('Dig not found');
+    await this.prisma.digs.delete({
+      where: {
+        id: id,
+      },
+    });
+    return {
+      success: true,
+      message: 'Digs deleted successfully',
+    };
+  }
 }

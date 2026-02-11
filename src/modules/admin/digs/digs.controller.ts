@@ -50,7 +50,6 @@ export class DigsController {
     return this.digsService.saveUserResponses(userId, digId, body.answers);
   }
 
-
   @Get(':id')
   async findOne(@Param('id') id: string, @Req() req: any) {
     return this.digsService.getSingleDig(id);
@@ -65,8 +64,22 @@ export class DigsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('update/:id')
-  async updateDig(@Param('id') id:string, @Req() req:any,@Body() updateDig:UpdateDigDto){
-    const userId=req.user.userId
-    return await this.digsService.updateDig(id,userId,updateDig)
+  async updateDig(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() updateDig: UpdateDigDto,
+  ) {
+    const userId = req.user.userId;
+    return await this.digsService.updateDig(id, userId, updateDig);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('delete/:id')
+  async deleteDig(
+    @Param('id') id: string,
+    @Req() req: any,
+  ) {
+    const userId = req.user.userId;
+    return await this.digsService.deleteDig(id, userId);
   }
 }

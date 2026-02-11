@@ -23,7 +23,6 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { JournelsModule } from './modules/journels/journels.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { MurmurationModule } from './modules/murmuration/murmuration.module';
-// import { SubscriptionModule } from './module/admin/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -80,7 +79,7 @@ import { MurmurationModule } from './modules/murmuration/murmuration.module';
     PaymentModule,
     JournelsModule,
     QuotesModule,
-    MurmurationModule,
+    MurmurationModule
     // SubscriptionModule,
   ],
   controllers: [AppController],

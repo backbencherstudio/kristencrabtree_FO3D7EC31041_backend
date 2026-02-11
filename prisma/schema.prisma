@@ -177,14 +177,16 @@ model UserSubscription {
   id     String  @id @default(cuid())
   userId String? @unique
   stripeSubscriptionId String?   @unique   
-
   paymentTransactions PaymentTransaction[]
   planName String?
   planId String?
   description String[]
   allowedPermissions String[]
   timesRenewed Int?
+  status String?
   user   User?   @relation(fields: [userId], references: [id])
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
 }
 
 model Ucode {

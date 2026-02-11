@@ -210,6 +210,7 @@ export class PlansService {
           planName: planId, // or map to a readable plan name
           description: ['Stripe subscription'],
           allowedPermissions: ['premium'], // adapt to your app
+          status:subscription.status,
           timesRenewed: {
             increment: 0, // stays same on first purchase
           },
@@ -218,6 +219,7 @@ export class PlansService {
           userId,
           stripeSubscriptionId: subscription.id,
           planName: planId,
+          status:subscription.status,
           description: ['Stripe subscription'],
           allowedPermissions: ['premium'],
           timesRenewed: 0,
