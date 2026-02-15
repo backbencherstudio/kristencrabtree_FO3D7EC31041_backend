@@ -132,7 +132,7 @@ export class ContentManagementService {
       }
 
       const page = paginationDto.page || 1;
-      const perPage = paginationDto.perPage|| 10;
+      const perPage = paginationDto.perPage || 10;
 
       const skip = (page - 1) * perPage;
       const take = perPage;
@@ -251,6 +251,27 @@ export class ContentManagementService {
       data: updatedMeditation,
     };
   }
+
+  // async updateMediCount(user_id, meditation_id) {
+  //   const meditation = await this.prisma.meditation.findUnique({
+  //     where: { id: meditation_id },
+  //   });
+  //   if (!meditation) {
+  //     return { success: false, message: 'Meditation not found' };
+  //   }
+  //   const updatedMeditation = await this.prisma.meditation.update({
+  //     where: { id: meditation_id },
+  //     data: {
+  //       listeningCount: meditation.listening_count + 1,
+  //     },
+  //   });
+  //   return {
+  //     success: true,
+  //     message: 'Meditation listening count updated successfully',
+  //     data: updatedMeditation,
+  //   };
+  // }
+
   async addListener(userId: string, meditationId: string) {
     try {
       const user = await this.prisma.user.findUnique({

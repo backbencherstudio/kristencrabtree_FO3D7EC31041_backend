@@ -279,6 +279,7 @@ export class MessageGateway
       this.chunks.delete(payload.recordingId);
     }
   }
+  
   async sendNotification(receverId: string, data: any) {
     this.server.to(receverId).emit('notification', data);
     await this.prisma.notification.create({

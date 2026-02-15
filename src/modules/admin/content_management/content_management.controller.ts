@@ -130,6 +130,27 @@ export class ContentManagementController {
       };
     }
   }
+  
+  // @UseGuards(JwtAuthGuard)
+  // @Patch('medi/:meditation_id')
+  // async updateMediCount(
+  //   @Param('meditation_id') meditation_id: string,
+  //   @Req() req: any,
+  // ) {
+  //   try {
+  //     const user_id = req.user?.userId;
+  //     return this.contentManagementService.updateMediCount(
+  //       user_id,
+  //       meditation_id,
+  //     );
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to update meditation',
+  //       error: error.message || error,
+  //     };
+  //   }
+  // }
 
   @UseGuards(JwtAuthGuard)
   @Delete('medi/:id')

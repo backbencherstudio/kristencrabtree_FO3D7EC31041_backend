@@ -330,7 +330,6 @@ model UserPaymentMethod {
 
   @@map("user_payment_methods")
 }
-
 model PaymentTransaction {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -814,4 +813,19 @@ model DigResponse {
 
   dig   Digs   @relation(fields: [dig_id], references: [id])
   layer Layers @relation(fields: [layer_id], references: [id])
+}
+
+model accessForSubscription{
+  id String @id @default(cuid())
+  subscriptionName String? @unique
+  journal_entries Int?
+  quotesPerday Int?
+  digsPerWeek Int?
+  murmurationPostLimit Int?
+  audioPostJournal Boolean?
+  meditationAccess Boolean?
+  adService Boolean?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@map("subscription_access")
 }
