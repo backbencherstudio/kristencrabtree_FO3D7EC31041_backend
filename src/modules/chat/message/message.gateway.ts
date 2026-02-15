@@ -15,6 +15,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import appConfig from '../../../config/app.config';
 import { ChatRepository } from '../../../common/repository/chat/chat.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {
@@ -39,7 +40,7 @@ export class MessageGateway
     '../../../../public/storage/recordings',
   );
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     if (!fs.existsSync(this.uploadsDir)) {
       fs.mkdirSync(this.uploadsDir, { recursive: true });
     }
@@ -58,8 +59,8 @@ export class MessageGateway
   // implement jwt token validation
   async handleConnection(client: Socket, ...args: any[]) {
     try {
-      // const token = client.handshake.headers.authorization?.split(' ')[1];
-      const token = client.handshake.auth.token;
+      const token = client.handshake.headers.authorization?.split(' ')[1];
+      // const token = client.handshake.auth.token;
       if (!token) {
         client.disconnect();
         console.log('No token provided');
@@ -77,6 +78,8 @@ export class MessageGateway
       }
 
       this.clients.set(userId, client.id);
+      client.join(userId); //added later
+
       // console.log(`User ${userId} connected with socket ${client.id}`);
       await ChatRepository.updateUserStatus(userId, 'online');
       // notify the user that the user is online
@@ -275,5 +278,25 @@ export class MessageGateway
       stream.write(buffer);
       this.chunks.delete(payload.recordingId);
     }
+  }
+  async sendNotification(receverId: string, data: any) {
+    this.server.to(receverId).emit('notification', data);
+    await this.prisma.notification.create({
+      data: {
+        receiver: {
+          connect: { id: receverId },
+        },
+        sender: data.senderId ? { connect: { id: data.senderId } } : undefined,
+
+        entity_id: data.entityId,
+
+        notification_event: {
+          create: {
+            type: data.type,
+            text: data.text,
+          },
+        },
+      },
+    });
   }
 }

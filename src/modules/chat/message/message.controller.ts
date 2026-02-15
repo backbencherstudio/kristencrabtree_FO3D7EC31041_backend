@@ -13,6 +13,7 @@ import { MessageGateway } from './message.gateway';
 import { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @ApiBearerAuth()
 @ApiTags('Message')
@@ -22,6 +23,7 @@ export class MessageController {
   constructor(
     private readonly messageService: MessageService,
     private readonly messageGateway: MessageGateway,
+    private readonly prisma: PrismaService,
   ) {}
 
   @ApiOperation({ summary: 'Send message' })
@@ -86,5 +88,20 @@ export class MessageController {
         message: error.message,
       };
     }
+  }
+   @Get('send')
+  async sendMessage() {
+    const admins = await this.prisma.user.findMany({
+      where: { type: 'admin' },
+      select: { id: true },
+    });
+
+    for (const admin of admins) {
+      this.messageGateway.sendNotification(admin.id, {
+        type: 'subscription',
+        text: `Parvej the boss bought premium subscription`,
+      });
+    }
+    return { success: true, message: 'Notifications sent' };
   }
 }

@@ -42,14 +42,14 @@ export class NotificationService {
               avatar: true,
             },
           },
-          receiver: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              avatar: true,
-            },
-          },
+          // receiver: {
+          //   select: {
+          //     id: true,
+          //     name: true,
+          //     email: true,
+          //     avatar: true,
+          //   },
+          // },
           notification_event: {
             select: {
               id: true,
@@ -69,11 +69,11 @@ export class NotificationService {
             );
           }
 
-          if (notification.receiver && notification.receiver.avatar) {
-            notification.receiver['avatar_url'] = SojebStorage.url(
-              appConfig().storageUrl.avatar + notification.receiver.avatar,
-            );
-          }
+          // if (notification.receiver && notification.receiver.avatar) {
+          //   notification.receiver['avatar_url'] = SojebStorage.url(
+          //     appConfig().storageUrl.avatar + notification.receiver.avatar,
+          //   );
+          // }
         }
       }
 

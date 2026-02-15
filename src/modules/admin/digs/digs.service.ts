@@ -150,15 +150,15 @@ export class DigsService {
             };
         }
       }
-      if(user.type !== 'admin'){
+      if (user.type !== 'admin') {
         await this.prisma.digs.update({
           where: { id: digId },
-          data:{
-            answeredCount:{
-              increment:1
-            }
-          }
-        })
+          data: {
+            answeredCount: {
+              increment: 1,
+            },
+          },
+        });
       }
       const savedResponses = await this.prisma.$transaction(
         createdResponses.map((r) =>

@@ -10,11 +10,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import Stripe from 'stripe';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
 import { Prisma } from '@prisma/client';
+import { MessageGateway } from 'src/modules/chat/message/message.gateway';
 @Injectable()
 export class PlansService {
   private stripe: Stripe;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(private readonly prisma: PrismaService,
+    private readonly messageGateway: MessageGateway,
+  ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
   }
   async createPlans(createPlanDto: CreatePlanDto) {
@@ -146,13 +149,13 @@ export class PlansService {
   }
 
   async checkoutSession(userId: string, planId: string, confirmed?: boolean) {
-
     const customerId = await this.ensureCustomerForUser(userId);
     const plan = await this.stripe.prices.retrieve(planId);
 
     if (!plan) {
       throw new BadRequestException('Invalid plan ID');
     }
+
     // 🟢 PHASE 1 — Create SetupIntent
     if (!confirmed) {
       const setupIntent = await this.stripe.setupIntents.create({
@@ -170,6 +173,7 @@ export class PlansService {
         clientSecret: setupIntent.client_secret,
       };
     }
+
     // PHASE 2 — Create subscription AFTER card is saved
     const paymentMethods = await this.stripe.paymentMethods.list({
       customer: customerId,
@@ -185,7 +189,6 @@ export class PlansService {
       items: [{ price: planId }],
       default_payment_method: paymentMethods.data[0].id,
       collection_method: 'charge_automatically',
-      // payment_behavior: 'error_if_incomplete',
       expand: [
         'latest_invoice.payment_intent',
         'latest_invoice',
@@ -194,30 +197,17 @@ export class PlansService {
     });
 
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice | null;
-
-    // console.log(latestInvoice);
-
-    // console.log(
-    //   'subscription object===============================================================',
-    //   subscription,
-    // );
-
     const paymentIntent =
       latestInvoice && typeof (latestInvoice as any).payment_intent !== 'string'
         ? ((latestInvoice as any).payment_intent as Stripe.PaymentIntent)
         : null;
-    // console.log(
-    //   'Intent object===============================================================',
-    //   paymentIntent,
-    // );
-    
+
     const item = subscription.items.data[0];
     const price = item.price;
-
-    // 👇 VERY IMPORTANT CAST
     const product = price.product as Stripe.Product;
     const planName = product.name;
 
+    // Handle 3D secure / requires_action
     if (paymentIntent?.status === 'requires_action') {
       return {
         step: 'REQUIRES_ACTION',
@@ -226,28 +216,26 @@ export class PlansService {
         subscriptionId: subscription.id,
       };
     }
-    if (subscription.status === 'active') {
-      await this.prisma.userSubscription.upsert({
-        where: {
-          userId, //@unique
-        },
+
+    // ✅ Wrap all Prisma writes in a transaction
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userSubscription.upsert({
+        where: { userId },
         update: {
-          planName: planName,
-          planId: planId, // or map to a readable plan name
+          planName,
+          planId,
           description: ['Stripe subscription'],
-          allowedPermissions: ['premium'], // adapt to your app
+          allowedPermissions: ['premium'],
           status: subscription.status,
           cardLast4: paymentMethods.data[0].card?.last4 || null,
           method: 'stripe',
-          timesRenewed: {
-            increment: 0, // stays same on first purchase
-          },
+          timesRenewed: { increment: 0 },
         },
         create: {
           userId,
-          planName: planName,
+          planName,
           stripeSubscriptionId: subscription.id,
-          planId: planId,
+          planId,
           status: subscription.status,
           cardLast4: paymentMethods.data[0].card?.last4 || null,
           method: 'stripe',
@@ -256,32 +244,37 @@ export class PlansService {
           timesRenewed: 0,
         },
       });
-      await this.prisma.paymentTransaction.create({
+
+      await tx.paymentTransaction.create({
         data: {
           type: 'subscription',
           provider: 'stripe',
           status: 'succeeded',
           raw_status: 'active',
-          amount: subscription.items.data[0].price.unit_amount
-            ? new Prisma.Decimal(
-                subscription.items.data[0].price.unit_amount / 100,
-              )
+          amount: price.unit_amount
+            ? new Prisma.Decimal(price.unit_amount / 100)
             : null,
-          currency: subscription.items.data[0].price.currency,
+          currency: price.currency,
           order_id: `${userId}-${planId}`,
-          user: {
-            connect: { id: userId },
-          },
-          subscription: {
-            connect: { userId },
-          },
+          user: { connect: { id: userId } },
+          subscription: { connect: { userId } },
         },
       });
-    }
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { subscriptionValidUntil: latestInvoice.period_end.toString() },
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { subscriptionValidUntil: latestInvoice.period_end.toString(), subscriptionPlan: planName },
+      });
     });
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    for(const admin of await this.prisma.user.findMany({where:{type:'admin'}})){
+      this.messageGateway.sendNotification(admin.id,{
+        type:'subscription',
+        text:`${user.first_name} subscribed to ${planName} plan`,
+      })
+    }
 
     return {
       step: 'SUBSCRIPTION_CREATED',
