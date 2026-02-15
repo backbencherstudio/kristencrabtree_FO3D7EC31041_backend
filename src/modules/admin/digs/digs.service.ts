@@ -110,7 +110,6 @@ export class DigsService {
             message: `Layer does not belong to this dig`,
           };
 
-        const questionType = String(layer.question_type).toLowerCase();
         let options: string[] = [];
         if (Array.isArray(layer.options)) options = layer.options;
         else if (typeof layer.options === 'string') {
@@ -123,7 +122,7 @@ export class DigsService {
             };
           }
         }
-
+        const questionType = String(layer.question_type).toLowerCase();
         if (questionType === 'option') {
           const normalizedOptions = options.map((o) =>
             String(o).trim().toLowerCase(),
@@ -151,7 +150,16 @@ export class DigsService {
             };
         }
       }
-
+      if(user.type !== 'admin'){
+        await this.prisma.digs.update({
+          where: { id: digId },
+          data:{
+            answeredCount:{
+              increment:1
+            }
+          }
+        })
+      }
       const savedResponses = await this.prisma.$transaction(
         createdResponses.map((r) =>
           this.prisma.digResponse.create({
@@ -216,17 +224,31 @@ export class DigsService {
     }
   }
 
-  async getAlldigs(userId: string) {
+  async getAlldigs(
+    userId: string,
+    paginationDto: { page?: number; perPage?: number },
+  ) {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       if (!user) return { success: false, message: 'User not found' };
+
+      const page = paginationDto.page || 1;
+      const perPage = paginationDto.perPage || 10;
+      const skip = (page - 1) * perPage;
 
       const answers = await this.prisma.digResponse.findMany({
         where: { user_id: userId },
       });
       const answeredDigIds = new Set(answers.map((a) => a.dig_id));
 
+      const total = await this.prisma.digs.count();
+
       const digs = await this.prisma.digs.findMany({
+        skip,
+        take: perPage,
+        orderBy: {
+          created_at: 'desc',
+        },
         include: {
           layers: true,
         },
@@ -240,6 +262,12 @@ export class DigsService {
         success: true,
         message: 'Digs retrieved successfully',
         data: digsWithStatus,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+        },
       };
     } catch (error) {
       throw error;

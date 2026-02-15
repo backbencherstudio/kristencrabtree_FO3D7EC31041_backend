@@ -23,6 +23,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { GoogleLoginDto } from './dto/google-login.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -194,11 +195,25 @@ export class AuthController {
     }
   }
 
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleLogin(): Promise<any> {
-    return HttpStatus.OK;
+    @Post('google')
+  async googleLogin(@Body() dto: GoogleLoginDto) {
+    const { user, token } = await this.authService.googleLogin(dto.token);
+    // Remove sensitive fields if any
+    const { password, ...safeUser } = user;
+    return {
+      message: 'Login success',
+      user: safeUser,
+      token,
+    };
   }
+
+
+
+  // @Get('google')
+  // @UseGuards(AuthGuard('google'))
+  // async googleLogin(): Promise<any> {
+  //   return HttpStatus.OK;
+  // }
 
   @Get('google/redirect')
   @UseGuards(AuthGuard('google'))

@@ -9,11 +9,13 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { DigsService } from './digs.service';
 import { CreateDigDto, SaveResponseDto } from './dto/create-dig.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { UpdateDigDto } from './dto/update-dig.dto';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Controller('admin/digs')
 export class DigsController {
@@ -56,9 +58,9 @@ export class DigsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll(@Req() req: any) {
+  async findAll(@Req() req: any,@Query() paginationDto:PaginationDto) {
     const userId = req.user?.userId;
-    return this.digsService.getAlldigs(userId);
+    return this.digsService.getAlldigs(userId,paginationDto);
   }
 
   @UseGuards(JwtAuthGuard)

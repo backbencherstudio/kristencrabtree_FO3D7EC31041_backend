@@ -11,13 +11,14 @@ import {
   UseInterceptors,
   UploadedFile,
   Put,
+  Query,
 } from '@nestjs/common';
 import { ContentManagementService } from './content_management.service';
 import { CreateContentManagementDto } from './dto/create-content_management.dto';
 import { UpdateContentManagementDto } from './dto/update-content_management.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { use } from 'passport';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Controller('admin/content-management')
 export class ContentManagementController {
@@ -51,7 +52,7 @@ export class ContentManagementController {
 
   @UseGuards(JwtAuthGuard)
   @Get('allqoutes')
-  findAll(@Req() req: any) {
+  findAll(@Req() req: any,@Query() pagintionDto:PaginationDto) {
     const userId = req.user.userId;
     if (userId === null) {
       return {
@@ -59,14 +60,14 @@ export class ContentManagementController {
         message: 'user id is missing',
       };
     }
-    return this.contentManagementService.findAllQoutes(userId);
+    return this.contentManagementService.findAllQoutes(userId, pagintionDto);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('meditaions')
-  findAllM(@Req() req: any) {
+  @Get('meditations')
+  findAllM(@Req() req: any,@Query() pagintionDto:PaginationDto) {
     const userId = req.user?.userId;
-    return this.contentManagementService.findAllMeditations(userId);
+    return this.contentManagementService.findAllMeditations(userId,pagintionDto);
   }
 
    // @UseGuards(JwtAuthGuard)

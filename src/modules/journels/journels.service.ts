@@ -67,7 +67,7 @@ export class JournelsService {
       throw error;
     }
   }
-  
+
   // async findAll(userId:string) {
   //   try {
 
@@ -114,7 +114,10 @@ export class JournelsService {
   //   }
   // }
 
-  async findAll(userId: string) {
+  async findAll(
+    userId,
+    paginationDto: { page?: number; perPage?: number } = {},
+  ) {
     try {
       const user = await this.prisma.user.findUnique({
         where: {
@@ -128,17 +131,29 @@ export class JournelsService {
         };
       }
 
+      const page = Number(paginationDto.page) || 1;
+      const perPage = Number(paginationDto.perPage) || 10;
+
+      const skip = (page - 1) * perPage;
+      const take = perPage;
+
+      const total = await this.prisma.journel.count({
+        where: { user_id: userId },
+      });
+
       const journals = await this.prisma.journel.findMany({
+        skip,
+        take,
         include: {
           _count: {
             select: { likeJournels: true },
           },
-          user:{
-            select:{
-              id:true,
-              name:true,
-              avatar:true
-            }
+          user: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
           },
           likeJournels: {
             where: {
@@ -156,24 +171,30 @@ export class JournelsService {
         };
       }
 
-      journals.forEach(item=>{
-        if(item.audio){
-          item['audio']=SojebStorage.url(
-            appConfig().storageUrl.audio+'/'+item.audio
-          )
+      journals.forEach((item) => {
+        if (item.audio) {
+          item['audio'] = SojebStorage.url(
+            appConfig().storageUrl.audio + '/' + item.audio,
+          );
         }
-      })
+      });
 
       const result = journals.map(({ _count, likeJournels, ...journel }) => ({
         ...journel,
         likeCount: _count.likeJournels,
-        isLiked: likeJournels.length > 0,  
+        isLiked: likeJournels.length > 0,
       }));
 
       return {
         success: true,
         message: 'Journals retrieved successfully',
-        data: result
+        data: result,
+         pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+        },
       };
     } catch (error) {
       throw error;
@@ -249,11 +270,11 @@ export class JournelsService {
       const journel = await this.prisma.journel.findUnique({
         where: { id, user_id },
       });
-      if(journel.audio){
-          journel['audio']=SojebStorage.url(
-            appConfig().storageUrl.audio+'/'+journel.audio
-          )
-        }
+      if (journel.audio) {
+        journel['audio'] = SojebStorage.url(
+          appConfig().storageUrl.audio + '/' + journel.audio,
+        );
+      }
       return {
         success: true,
         message: 'Journel retrieved successfully',

@@ -18,6 +18,7 @@ import { Roles } from '../../../common/guard/role/roles.decorator';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { userActionDto } from './dto/user-action.dto';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @ApiBearerAuth()
 @ApiTags('User')
@@ -43,16 +44,14 @@ export class UserController {
 
   @ApiResponse({ description: 'Get all users' })
   @Get()
-  async findAll(
-    @Query() query: { q?: string; status?: string; approved?: string, joined?:string },
-  ) {
+  async findAll(@Query() query: { q?: string; status?: string; approved?: string, joined?:string}, @Query() paginationDto: PaginationDto) {
     try {
       const q = query.q;
       const status = query.status;
       const approved = query.approved;
       const joined= query.joined
 
-      const users = await this.userService.findAll({ q, status, approved, joined });
+      const users = await this.userService.findAll({ q, status, approved, joined, paginationDto });
       return users;
     } catch (error) {
       return {

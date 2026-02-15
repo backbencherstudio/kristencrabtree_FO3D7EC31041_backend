@@ -44,13 +44,20 @@ export class UserService {
     status,
     approved,
     joined,
+    paginationDto,
   }: {
     q?: string;
     status?: string;
     approved?: string;
     joined?: string;
+    paginationDto:{ page: number; perPage: number };
   }) {
     try {
+      const page = paginationDto.page || 1;
+      const perPage = paginationDto.perPage || 10;
+      const skip = (page - 1) * perPage;
+      const take= perPage;
+
       const where_condition = {};
       if (q) {
         where_condition['OR'] = [
@@ -76,12 +83,20 @@ export class UserService {
           lte: end,
         };
       }
+      const total= await this.prisma.user.count({
+        where: {
+          ...where_condition,
+          type: 'user',
+        },
+      });
 
       const users = await this.prisma.user.findMany({
         where: {
           ...where_condition,
           type: 'user',
         },
+        skip,
+        take,
         select: {
           id: true,
           name: true,
@@ -99,6 +114,12 @@ export class UserService {
       return {
         success: true,
         data: users,
+        pagination:{
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+        }
       };
     } catch (error) {
       return {

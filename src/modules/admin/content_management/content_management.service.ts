@@ -9,6 +9,7 @@ import * as ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+// import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Injectable()
 export class ContentManagementService {
@@ -64,7 +65,11 @@ export class ContentManagementService {
             return reject(err);
           }
           const duration = metadata.format?.duration;
-          if (typeof duration === 'number' && !isNaN(duration) && duration > 0) {
+          if (
+            typeof duration === 'number' &&
+            !isNaN(duration) &&
+            duration > 0
+          ) {
             resolve(duration);
           } else {
             reject(new Error('Duration not found or invalid in metadata'));
@@ -96,14 +101,14 @@ export class ContentManagementService {
         meditation_description:
           createContentManagementDto.meditation_description,
         meditation_audio: fileName,
-        duration: durationInString || null, 
+        duration: durationInString || null,
       },
     });
 
-    if(newMeditation.meditation_audio){
-      newMeditation['meditation_audio']=SojebStorage.url(
-        appConfig().storageUrl.audio + fileName
-      )
+    if (newMeditation.meditation_audio) {
+      newMeditation['meditation_audio'] = SojebStorage.url(
+        appConfig().storageUrl.audio + fileName,
+      );
     }
 
     return {
@@ -111,10 +116,12 @@ export class ContentManagementService {
       message: 'Meditation created successfully',
       data: newMeditation,
     };
-  
   }
-  
-  async findAllMeditations(userId: string) {
+
+  async findAllMeditations(
+    userId: string,
+    paginationDto: { page?: number; perPage?: number } = {},
+  ) {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -124,7 +131,18 @@ export class ContentManagementService {
         return { success: false, message: 'User not found' };
       }
 
+      const page = paginationDto.page || 1;
+      const perPage = paginationDto.perPage|| 10;
+
+      const skip = (page - 1) * perPage;
+      const take = perPage;
+
       const meditations = await this.prisma.meditation.findMany({
+        skip,
+        take,
+        orderBy: {
+          created_at: 'desc', // or 'asc'
+        },
         include: {
           _count: {
             select: {
@@ -140,6 +158,8 @@ export class ContentManagementService {
         },
       });
 
+      const total = await this.prisma.meditation.count();
+
       if (meditations.length === 0) {
         return {
           success: false,
@@ -152,17 +172,27 @@ export class ContentManagementService {
         listenersCount: meditation._count.listeners,
         isFav: meditation._count.favoriteMeditations > 0,
         _count: undefined,
+        meditation_audio: SojebStorage.url(
+          appConfig().storageUrl.audio + meditation.meditation_audio,
+        ),
       }));
 
       return {
         success: true,
         message: 'Meditations retrieved successfully',
         data,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+        },
       };
     } catch (error) {
       throw error;
     }
   }
+
   async update(
     user_id: string,
     meditation_id: string,
@@ -398,7 +428,10 @@ export class ContentManagementService {
   //Meditations management end
 
   //qoute management start
-  async findAllQoutes(userId: string) {
+  async findAllQoutes(
+    userId: string,
+    paginationDto: { page?: number; perPage?: number } = {},
+  ) {
     try {
       if (!userId) {
         return {
@@ -406,7 +439,8 @@ export class ContentManagementService {
           message: 'Authentication error',
         };
       }
-      const user = await this.prisma.user.findUnique({
+
+      const user = await this.prisma.user.findFirst({
         where: {
           id: userId,
           type: 'admin',
@@ -415,16 +449,35 @@ export class ContentManagementService {
 
       if (!user) {
         return {
-          Success: false,
+          success: false,
           message: 'No user found',
         };
       }
+
+      const page = Number(paginationDto.page) || 1;
+      const perPage = Number(paginationDto.perPage) || 10;
+
+      const skip = (page - 1) * perPage;
+      const take = perPage;
+
+      const total = await this.prisma.quote.count({
+        where: {
+          user: {
+            type: 'admin',
+          },
+        },
+      });
 
       const quotes = await this.prisma.quote.findMany({
         where: {
           user: {
             type: 'admin',
           },
+        },
+        skip,
+        take,
+        orderBy: {
+          created_at: 'desc',
         },
         include: {
           user: {
@@ -444,28 +497,27 @@ export class ContentManagementService {
         },
       });
 
-      if (quotes.length === 0) {
-        return {
-          success: false,
-          message: 'No admin quotes found',
-        };
-      }
-
-      // Add like count to each quote
       const quotesWithLikes = quotes.map((quote) => ({
         ...quote,
-        // likeCount: quote._count.quoteReactions,
+        likeCount: quote._count.quoteReactions,
       }));
 
       return {
-        Success: true,
+        success: true,
         message: 'Quotes retrieved successfully',
         data: quotesWithLikes,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+        },
       };
     } catch (error) {
       throw error;
     }
   }
+
   async updateQuoteStatus(userId: string, quoteId: string) {
     try {
       const user = await this.prisma.user.findFirst({

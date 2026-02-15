@@ -337,16 +337,42 @@ export class DashboardService {
       }
     }
 
+    const digs = await this.prisma.digs.findMany({
+      orderBy:{
+        answeredCount:'desc'
+      },
+      take:5
+    })
+    
+
     return {
       success: true,
       data: {
-        total: totalRevenue,
-        yearly: yearlyRevenue.toString(),
-        monthly: monthlyRevenue.toString(),
+        total: {
+          text:"Total Reveneau",
+          value: totalRevenue.toString(),
+        },
+        yearly: {
+          text: "Yearly Revenue",
+          value: yearlyRevenue.toString(),
+        },
+        monthly: {
+          text: "Monthly Revenue",
+          value: monthlyRevenue.toString(),
+        },
+        topDigs:{
+          text:"Top Active Exercises",
+          digs:digs.map(dig=>({
+          id:dig.id,
+          title:dig.title,
+        }))
+        }
       },
     };
   }
-
+  async topdigs(){
+    
+  }
   findOne(id: number) {
     return `This action returns a #${id} dashboard`;
   }

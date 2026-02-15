@@ -2,6 +2,7 @@
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -29,6 +30,7 @@ export class AuthService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private mailService: MailService,
+    @Inject('FIREBASE_AUTH') private firebaseAuth: any,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -1203,4 +1205,33 @@ export class AuthService {
     }
   }
   // --------- end 2FA ---------
+
+   async googleLogin(idToken: string) {
+    try {
+      const decoded = await this.firebaseAuth.verifyIdToken(idToken);
+      const { email, name, uid } = decoded;
+
+      if (!email) throw new UnauthorizedException('No email in token');
+
+      let user = await this.prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            name: name || '',
+            firebaseUid: uid,
+            // maybe set other default fields
+          },
+        });
+      }
+
+      const payload = { sub: user.id, email: user.email };
+      const token = this.jwtService.sign(payload);
+
+      return { user, token };
+    } catch (err) {
+      throw new UnauthorizedException('Invalid Firebase token');
+    }
+  }
+
 }

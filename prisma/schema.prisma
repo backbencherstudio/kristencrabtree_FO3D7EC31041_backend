@@ -76,6 +76,7 @@ model User {
   sender_messages               Message[]      @relation("sender")
   receiver_notifications        Notification[] @relation("receiver")
   sender_notifications          Notification[] @relation("sender")
+  firebaseUid String?
 
   user_payment_methods UserPaymentMethod[]
   user_settings        UserSetting[]
@@ -765,6 +766,7 @@ model Digs {
 
   layers       Layers[]
   digResponses DigResponse[]
+  answeredCount Int? @default(0)
 
   @@map("digs")
 }

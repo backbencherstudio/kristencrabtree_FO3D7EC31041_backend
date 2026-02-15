@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { count } from 'console';
 
 @Injectable()
 export class QuotesService {
@@ -58,7 +59,13 @@ export class QuotesService {
           data: [],
         };
       }
-
+      quotes.map((quote)=>{
+        quote['reactions'] = this.prisma.quoteReaction.count({
+          where:{
+            qouteId: quote.id,
+          }
+        })
+      })
       return {
         success: true,
         message: 'Quotes retrieved successfully',

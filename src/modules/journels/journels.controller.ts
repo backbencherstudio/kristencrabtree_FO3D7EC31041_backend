@@ -10,12 +10,14 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { JournelsService } from './journels.service';
 import { CreateJournelDto } from './dto/create-journel.dto';
 import { UpdateJournelDto } from './dto/update-journel.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Controller('journels')
 export class JournelsController {
@@ -42,8 +44,9 @@ export class JournelsController {
   }
   @UseGuards(JwtAuthGuard)
   @Get('all')
-  findAll(@Req() req:any) {
-    return this.journelsService.findAll(req.user.userId);
+  findAll(@Req() req:any,@Query() paginationDto:PaginationDto) {
+    const userId = req.user?.userId;
+    return this.journelsService.findAll(userId,paginationDto);
   }
   @UseGuards(JwtAuthGuard)
   @Get('recommended')
