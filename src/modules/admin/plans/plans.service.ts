@@ -15,7 +15,8 @@ import { MessageGateway } from 'src/modules/chat/message/message.gateway';
 export class PlansService {
   private stripe: Stripe;
 
-  constructor(private readonly prisma: PrismaService,
+  constructor(
+    private readonly prisma: PrismaService,
     private readonly messageGateway: MessageGateway,
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
@@ -162,6 +163,7 @@ export class PlansService {
         customer: customerId,
         usage: 'off_session',
         payment_method_types: ['card'],
+        metadata: { userId },
       });
 
       if (!setupIntent.client_secret) {
@@ -174,7 +176,7 @@ export class PlansService {
       };
     }
 
-    // PHASE 2 — Create subscription AFTER card is saved
+    // 🟢 PHASE 2 — Create subscription (webhook will handle database writes)
     const paymentMethods = await this.stripe.paymentMethods.list({
       customer: customerId,
       type: 'card',
@@ -184,16 +186,17 @@ export class PlansService {
       throw new BadRequestException('No payment method found');
     }
 
+    // Create subscription with userId in metadata for webhook
     const subscription = await this.stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: planId }],
       default_payment_method: paymentMethods.data[0].id,
       collection_method: 'charge_automatically',
-      expand: [
-        'latest_invoice.payment_intent',
-        'latest_invoice',
-        'items.data.price.product',
-      ],
+      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        userId,
+        planId,
+      },
     });
 
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice | null;
@@ -202,12 +205,7 @@ export class PlansService {
         ? ((latestInvoice as any).payment_intent as Stripe.PaymentIntent)
         : null;
 
-    const item = subscription.items.data[0];
-    const price = item.price;
-    const product = price.product as Stripe.Product;
-    const planName = product.name;
-
-    // Handle 3D secure / requires_action
+    // Handle 3D Secure / requires_action
     if (paymentIntent?.status === 'requires_action') {
       return {
         step: 'REQUIRES_ACTION',
@@ -217,69 +215,13 @@ export class PlansService {
       };
     }
 
-    // ✅ Wrap all Prisma writes in a transaction
-    await this.prisma.$transaction(async (tx) => {
-      await tx.userSubscription.upsert({
-        where: { userId },
-        update: {
-          planName,
-          planId,
-          description: ['Stripe subscription'],
-          allowedPermissions: ['premium'],
-          status: subscription.status,
-          cardLast4: paymentMethods.data[0].card?.last4 || null,
-          method: 'stripe',
-          timesRenewed: { increment: 0 },
-        },
-        create: {
-          userId,
-          planName,
-          stripeSubscriptionId: subscription.id,
-          planId,
-          status: subscription.status,
-          cardLast4: paymentMethods.data[0].card?.last4 || null,
-          method: 'stripe',
-          description: ['Stripe subscription'],
-          allowedPermissions: ['premium'],
-          timesRenewed: 0,
-        },
-      });
-
-      await tx.paymentTransaction.create({
-        data: {
-          type: 'subscription',
-          provider: 'stripe',
-          status: 'succeeded',
-          raw_status: 'active',
-          amount: price.unit_amount
-            ? new Prisma.Decimal(price.unit_amount / 100)
-            : null,
-          currency: price.currency,
-          order_id: `${userId}-${planId}`,
-          user: { connect: { id: userId } },
-          subscription: { connect: { userId } },
-        },
-      });
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { subscriptionValidUntil: latestInvoice.period_end.toString(), subscriptionPlan: planName },
-      });
-    });
-
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-
-    for(const admin of await this.prisma.user.findMany({where:{type:'admin'}})){
-      this.messageGateway.sendNotification(admin.id,{
-        type:'subscription',
-        text:`${user.first_name} subscribed to ${planName} plan`,
-      })
-    }
-
+    // ✅ No database writes here - webhook will handle everything
+    // Return subscription details immediately
     return {
       step: 'SUBSCRIPTION_CREATED',
       subscriptionId: subscription.id,
       status: subscription.status,
+      message: 'Subscription created successfully. Processing payment...',
     };
   }
 

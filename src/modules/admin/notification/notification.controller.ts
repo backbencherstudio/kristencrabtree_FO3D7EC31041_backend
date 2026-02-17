@@ -38,8 +38,8 @@ export class NotificationController {
     try {
       const user_id = req.user.userId;
       const notification = await this.notificationService.remove(id, user_id);
-
       return notification;
+      
     } catch (error) {
       return {
         success: false,

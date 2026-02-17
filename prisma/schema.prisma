@@ -69,7 +69,7 @@ model User {
   is_two_factor_enabled         Int?           @default(0)
   two_factor_secret             String? // secret key for two factor authentication
   subscriptionValidUntil        String? // subscription valid until
-  subscriptionPlan String? @default("free")// subscription plan name
+  subscriptionPlan              String?        @default("free") // subscription plan name
   accounts                      Account[]
   creator_conversations         Conversation[] @relation("creator")
   participant_conversations     Conversation[] @relation("participant")
@@ -77,7 +77,7 @@ model User {
   sender_messages               Message[]      @relation("sender")
   receiver_notifications        Notification[] @relation("receiver")
   sender_notifications          Notification[] @relation("sender")
-  firebaseUid String?
+  firebaseUid                   String?
 
   user_payment_methods UserPaymentMethod[]
   user_settings        UserSetting[]
@@ -176,21 +176,23 @@ model Plans {
 }
 
 model UserSubscription {
-  id                   String               @id @default(cuid())
-  userId               String?              @unique
-  stripeSubscriptionId String?              @unique
-  paymentTransactions  PaymentTransaction[]
-  planName             String?
-  planId               String?
-  description          String[]
-  allowedPermissions   String[]
-  timesRenewed         Int?
-  status               String?
-  cardLast4            String?
-  method               String?
-  user                 User?                @relation(fields: [userId], references: [id])
-  created_at           DateTime             @default(now())
-  updated_at           DateTime             @default(now())
+  id                    String                  @id @default(cuid())
+  userId                String?                 @unique
+  stripeSubscriptionId  String?                 @unique
+  paymentTransactions   PaymentTransaction[]
+  planName              String?
+  planId                String?
+  description           String[]
+  allowedPermissions    String[]
+  timesRenewed          Int?
+  status                String?
+  cardLast4             String?
+  method                String?
+  accessId              String?                 
+  // access                accessForSubscription?  @relation(fields: [accessId], references: [id])
+  user                  User?                   @relation(fields: [userId], references: [id])
+  created_at            DateTime                @default(now())
+  updated_at            DateTime                @default(now())
 }
 
 model Ucode {
@@ -330,6 +332,7 @@ model UserPaymentMethod {
 
   @@map("user_payment_methods")
 }
+
 model PaymentTransaction {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -764,9 +767,9 @@ model Digs {
   user_id String?
   user    User?   @relation(fields: [user_id], references: [id])
 
-  layers       Layers[]
-  digResponses DigResponse[]
-  answeredCount Int? @default(0)
+  layers        Layers[]
+  digResponses  DigResponse[]
+  answeredCount Int?          @default(0)
 
   @@map("digs")
 }
@@ -815,17 +818,19 @@ model DigResponse {
   layer Layers @relation(fields: [layer_id], references: [id])
 }
 
-model accessForSubscription{
-  id String @id @default(cuid())
-  subscriptionName String? @unique
-  journal_entries Int?
-  quotesPerday Int?
-  digsPerWeek Int?
+model accessForSubscription {
+  id                   String            @id @default(cuid())
+  subscriptionName     String?           @unique
+  journal_entries      Int?
+  quotesPerday         Int?
+  digsPerWeek          Int?
   murmurationPostLimit Int?
-  audioPostJournal Boolean?
-  meditationAccess Boolean?
-  adService Boolean?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  audioPostJournal     Boolean?
+  meditationAccess     Boolean?
+  adService            Boolean?
+  // userSubscription     UserSubscription?
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+
   @@map("subscription_access")
 }
