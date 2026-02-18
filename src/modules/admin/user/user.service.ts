@@ -1,4 +1,3 @@
-import { UserSubscription } from './../../../../node_modules/.prisma/client/index.d';
 import {
   BadGatewayException,
   BadRequestException,
@@ -132,12 +131,41 @@ export class UserService {
 
   async findOne(id: string) {
     try {
-      // 
-      const UserSubscription=await this.prisma.userSubscription.findMany({})
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: id,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          type: true,
+          phone_number: true,
+          approved_at: true,
+          created_at: true,
+          updated_at: true,
+          avatar: true,
+          billing_id: true,
+        },
+      });
+
+      // add avatar url to user
+      if (user.avatar) {
+        user['avatar_url'] = SojebStorage.url(
+          appConfig().storageUrl.avatar + user.avatar,
+        );
+      }
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
 
       return {
         success: true,
-        data: UserSubscription
+        data: user,
       };
     } catch (error) {
       return {
@@ -267,7 +295,5 @@ export class UserService {
       message: 'User status updated successfully',
     };
   }
-
-
-
+  
 }

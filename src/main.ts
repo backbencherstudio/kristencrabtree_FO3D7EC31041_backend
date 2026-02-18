@@ -13,7 +13,6 @@ import { CustomExceptionFilter } from './common/exception/custom-exception.filte
 import { SojebStorage } from './common/lib/Disk/SojebStorage';
 import * as path from 'path';
 async function bootstrap() {
-
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
@@ -22,8 +21,12 @@ async function bootstrap() {
   // app.use('/payment/stripe/webhook', express.raw({ type: 'application/json' }));
 
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
+  });
   app.use(helmet());
+  
   // Enable it, if special charactrers not encoding perfectly
   // app.use((req, res, next) => {
   //   // Only force content-type for specific API routes, not Swagger or assets
@@ -46,7 +49,7 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new CustomExceptionFilter());
-  
+
   // storage setup
   SojebStorage.config({
     driver: 'local',

@@ -114,24 +114,41 @@ async function main() {
     if(plan==="free"){
       await prisma.accessForSubscription.create({
         data:{
-          subscriptionName: plan,
+          id:"1",
+          subscriptionName:"free",
           journal_entries:2,
           quotesPerday:1,
           digsPerWeek:3,
-          murmurationPostLimit:2,
+          murmurationLimit:true,
           audioPostJournal:false,
           meditationAccess:false,
           adService:true,
         }
       })
-    } else if(plan==="monthly" || plan==="yearly"){
+    } else if(plan==="monthly"){
       await prisma.accessForSubscription.create({
         data:{
-          subscriptionName: plan,
-          journal_entries:200,
-          quotesPerday:4,
-          digsPerWeek:200,
-          murmurationPostLimit:200,
+          id:"2",
+          subscriptionName: "monthly",
+          journal_entries:null,
+          quotesPerday:null,
+          digsPerWeek:null,
+          murmurationLimit:false,
+          audioPostJournal:true,
+          meditationAccess:true,
+          adService:false,
+        }
+      })
+    }
+    else if(plan==="yearly"){
+      await prisma.accessForSubscription.create({
+        data:{
+          id:"3",
+          subscriptionName:"yearly",
+          journal_entries:null,
+          quotesPerday:null,
+          digsPerWeek:null,
+          murmurationLimit:false,
           audioPostJournal:true,
           meditationAccess:true,
           adService:false,

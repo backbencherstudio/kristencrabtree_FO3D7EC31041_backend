@@ -173,7 +173,19 @@ export class DigsService {
         ),
       );
 
-      return { success: true, data: savedResponses };
+      // Calculate total points
+      let totalPoints = 0;
+      const layersWithPoints = await this.prisma.layers.findMany({
+        where: { id: { in: layerIds } },
+        select: { point: true },
+      });
+
+      totalPoints = layersWithPoints.reduce(
+        (sum, layer) => sum + (layer.point || 0),
+        0,
+      );
+
+      return { success: true, data: savedResponses, totalPoints };
     } catch (error) {
       return {
         success: false,

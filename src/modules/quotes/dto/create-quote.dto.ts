@@ -1,6 +1,14 @@
-import { IsString } from "class-validator";
+import { Focus_Area } from '@prisma/client';
+import { Transform } from 'class-transformer';
+import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class CreateQuoteDto {
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Focus_Area, { each: true })
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  type: Focus_Area[];
+
   @IsString()
   quote_author?: string;
 
@@ -10,7 +18,6 @@ export class CreateQuoteDto {
   @IsString()
   reason?: string;
 }
-
 
 /*
 model Quote {

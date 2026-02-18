@@ -8,7 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { OnModuleInit } from '@nestjs/common';
+import { NotFoundException, OnModuleInit } from '@nestjs/common';
 import { MessageStatus } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import * as path from 'path';
@@ -19,7 +19,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
   },
   maxHttpBufferSize: 1e8, // 100MB
 })
@@ -59,15 +60,20 @@ export class MessageGateway
   // implement jwt token validation
   async handleConnection(client: Socket, ...args: any[]) {
     try {
-      const token = client.handshake.headers.authorization?.split(' ')[1];
+      const token = client.handshake.auth.token;
+      // console.log(client.handshake.auth.token);
+      // const token = client.handshake.headers.authorization?.split(' ')[1];
       // const token = client.handshake.auth.token;
       if (!token) {
         client.disconnect();
+        // throw new NotFoundException('No token provided');
         console.log('No token provided');
-        return;
+        return "No token provided";
       }
 
-      const decoded: any = jwt.verify(token, appConfig().jwt.secret);
+      const decoded: any = jwt.verify(token, appConfig().jwt.secret, {
+        ignoreExpiration: true, // Ignore token expiration for WebSocket connections
+      });
       // const decoded: any = this.jwtService.verify(token);
       // const userId = client.handshake.query.userId as string;
       const userId = decoded.sub;
@@ -87,7 +93,7 @@ export class MessageGateway
         user_id: userId,
         status: 'online',
       });
-
+      
       console.log(`User ${userId} connected`);
     } catch (error) {
       client.disconnect();
@@ -279,7 +285,7 @@ export class MessageGateway
       this.chunks.delete(payload.recordingId);
     }
   }
-  
+
   async sendNotification(receverId: string, data: any) {
     this.server.to(receverId).emit('notification', data);
     await this.prisma.notification.create({

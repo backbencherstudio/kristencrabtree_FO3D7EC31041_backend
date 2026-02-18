@@ -2,10 +2,15 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { count } from 'console';
-
+import { SubscriptionManager } from 'src/common/helper/subscription.manager';
+import Redis from 'ioredis';
+import { InjectRedis } from '@nestjs-modules/ioredis';
 @Injectable()
 export class QuotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectRedis() private readonly redis: Redis,
+  ) {}
   async create(user_id: string, createQuoteDto: CreateQuoteDto) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -21,6 +26,7 @@ export class QuotesService {
         data: {
           ...createQuoteDto,
           user_id,
+          type: { set: createQuoteDto.type },
         },
       });
       return {
@@ -59,13 +65,13 @@ export class QuotesService {
           data: [],
         };
       }
-      quotes.map((quote)=>{
+      quotes.map((quote) => {
         quote['reactions'] = this.prisma.quoteReaction.count({
-          where:{
+          where: {
             qouteId: quote.id,
-          }
-        })
-      })
+          },
+        });
+      });
       return {
         success: true,
         message: 'Quotes retrieved successfully',
@@ -245,11 +251,25 @@ export class QuotesService {
   }
   async getRandomAdminQuote(userId: string) {
     try {
+      const userPlan = await SubscriptionManager(this.prisma, userId);
+
+      // For free users, check Redis cache first
+      if (userPlan.subscriptionName === 'free') {
+        const cachedRaw = await this.redis.get(`quote:daily:${userId}`);
+
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          return {
+            success: true,
+            message: 'Random admin quote retrieved',
+            data: cached,
+          };
+        }
+      }
+
       const total = await this.prisma.quote.count({
         where: {
-          user: {
-            type: 'admin',
-          },
+          user: { type: 'admin' },
         },
       });
 
@@ -265,21 +285,49 @@ export class QuotesService {
 
       const quote = await this.prisma.quote.findFirst({
         where: {
-          user: {
-            type: 'admin',
+          user: { type: 'admin' },
+          type: {
+            hasSome: userPlan.focus_area, 
           },
         },
-        orderBy: {
-          created_at: 'asc',
-        },
+        orderBy: { created_at: 'asc' },
         skip: randomIndex,
         take: 1,
       });
 
+      const favourite = await this.prisma.quoteReaction.findFirst({
+        where: {
+          userId: userId,
+          qouteId: quote.id,
+        },
+      });
+
+      const quoteWithMeta = {
+        ...quote,
+        isFavourite: !!favourite,
+      };
+
+      // Cache the quote for free users until midnight (so it resets daily)
+      if (userPlan.subscriptionName === 'free') {
+        const now = new Date();
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0); // next midnight
+        const secondsUntilMidnight = Math.floor(
+          (midnight.getTime() - now.getTime()) / 1000,
+        );
+
+        await this.redis.set(
+          `quote:daily:${userId}`,
+          JSON.stringify(quoteWithMeta),
+          'EX',
+          secondsUntilMidnight,
+        );
+      }
+
       return {
         success: true,
         message: 'Random admin quote retrieved',
-        data: quote,
+        data: quoteWithMeta,
       };
     } catch (error) {
       return {

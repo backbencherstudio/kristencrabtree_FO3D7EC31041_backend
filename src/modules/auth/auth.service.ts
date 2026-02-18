@@ -23,6 +23,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 import { DigsService } from '../admin/digs/digs.service';
 import * as bcrypt from 'bcrypt';
+import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 
 @Injectable()
 export class AuthService {
@@ -50,6 +51,7 @@ export class AuthService {
           type: true,
           gender: true,
           date_of_birth: true,
+          subscriptionPlan:true,
           created_at: true,
         },
       });
@@ -63,7 +65,13 @@ export class AuthService {
       );
       const xp = pointsResult && pointsResult.data ? pointsResult.data : 0;
 
-      const userData = { ...user, xp };
+      const permissions=await SubscriptionManager(this.prisma,userId);
+
+      if(!permissions){
+         return { success: false, message: 'Permission data not found' };
+      }
+
+      const userData = { ...user, xp, permissions};
 
       if (user.avatar) {
         userData['avatar_url'] = SojebStorage.url(

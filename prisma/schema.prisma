@@ -579,6 +579,7 @@ model Quote {
   quote_author String?
   quote_text   String? @db.Text
   reason       String? @db.Text
+  type         Focus_Area[]
 
   status Boolean? @default(true)
 
@@ -819,12 +820,12 @@ model DigResponse {
 }
 
 model accessForSubscription {
-  id                   String            @id @default(cuid())
+  id                   String @unique
   subscriptionName     String?           @unique
   journal_entries      Int?
   quotesPerday         Int?
   digsPerWeek          Int?
-  murmurationPostLimit Int?
+  murmurationLimit Boolean?
   audioPostJournal     Boolean?
   meditationAccess     Boolean?
   adService            Boolean?
