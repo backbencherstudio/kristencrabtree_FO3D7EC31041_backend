@@ -7,12 +7,16 @@ import { CreateDigDto, SaveResponseItemDto } from './dto/create-dig.dto';
 import { UpdateDigDto } from './dto/update-dig.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { validate } from 'class-validator';
-import e from 'express';
-import { boolean } from 'zod';
+import Redis from 'ioredis';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import { SubscriptionManager } from 'src/common/helper/subscription.manager';
+import { getLastNDaysRange } from '../dashboard/helper.utils';
 
 @Injectable()
 export class DigsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,
+    @InjectRedis() private readonly redis: Redis,
+  ) {}
 
   async create(userid: string, createDigDto: CreateDigDto) {
     try {
@@ -35,6 +39,7 @@ export class DigsService {
       const createdDig = await this.prisma.digs.create({
         data: {
           title: createDigDto.title,
+          type: { set: createDigDto.type },
           user_id: userid,
           layers: {
             create: createDigDto.layers.map((layer) => ({
@@ -313,6 +318,68 @@ export class DigsService {
       return { success: true, data: dig };
     } catch (error) {
       throw error;
+    }
+  }
+
+  async getRandom(userId) {
+    try {
+
+      // const week= getLastNDaysRange(-7)
+      // console.log(week);
+
+      const userPlan = await SubscriptionManager(this.prisma, userId);
+
+        if (userPlan.subscriptionName === 'free') {
+        const cachedRaw = await this.redis.get(`digs:daily:${userId}`);
+
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          return {
+            success: true,
+            message: 'Random admin quote retrieved',
+            data: cached,
+          };
+        }
+      }
+
+      const total = await this.prisma.digs.count({
+        where:{
+          type: {
+            hasSome: userPlan.focus_area,
+          },
+        }
+      });
+
+      if (total === 0) {
+        return {
+          success: true,
+          message: 'No Digs found',
+          data: null,
+        };
+      }
+      const randomIndex = Math.floor(Math.random() * total);
+
+      const dig = await this.prisma.digs.findFirst({
+        where: {
+          type: {
+            hasSome: userPlan.focus_area,
+          },
+        },
+        include: {
+          layers: true,
+        },
+        orderBy: { created_at: 'asc' },
+        skip: randomIndex,
+        take: 3,
+      });
+
+      return {
+        success: true,
+        message: 'Dig fetch successfull',
+        dig,
+      };
+    } catch (err) {
+      console.log(err);
     }
   }
 

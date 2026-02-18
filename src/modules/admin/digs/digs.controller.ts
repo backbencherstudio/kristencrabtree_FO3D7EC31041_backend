@@ -51,6 +51,13 @@ export class DigsController {
     return this.digsService.saveUserResponses(userId, digId, body.answers);
   }
 
+   @UseGuards(JwtAuthGuard)
+  @Get('getRandomDig')
+  async getRandomDig(@Req() req: any){
+    const userId=req.user.userId;
+    return await this.digsService.getRandom(userId)
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string, @Req() req: any) {
     return this.digsService.getSingleDig(id);

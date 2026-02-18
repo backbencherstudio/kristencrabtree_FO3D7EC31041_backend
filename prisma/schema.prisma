@@ -99,6 +99,7 @@ model User {
   layers               Layers[]
   digs                 Digs[]
   userSubscription     UserSubscription[]
+  weeklyDigs UserWeeklyDig[]
 
   @@map("users")
 }
@@ -764,6 +765,7 @@ model Digs {
   deleted_at DateTime?
 
   title String
+  type Focus_Area[]
 
   user_id String?
   user    User?   @relation(fields: [user_id], references: [id])
@@ -835,3 +837,19 @@ model accessForSubscription {
 
   @@map("subscription_access")
 }
+
+model UserWeeklyDig {
+  id         String   @id @default(cuid())
+  userId     String
+  digId      String
+  weekStart  DateTime
+  position   Int      // 1, 2, 3 (reveal order)
+  completed  Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+  dig  Digs @relation(fields: [digId], references: [id])
+
+  @@unique([userId, digId, weekStart])
+  @@index([userId, weekStart])
+}
+

@@ -24,6 +24,7 @@ import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 import { DigsService } from '../admin/digs/digs.service';
 import * as bcrypt from 'bcrypt';
 import { SubscriptionManager } from 'src/common/helper/subscription.manager';
+import { calculateUserDigPoints } from './helper';
 
 @Injectable()
 export class AuthService {
@@ -60,10 +61,8 @@ export class AuthService {
         return { success: false, message: 'User not found' };
       }
 
-      const pointsResult = await new DigsService(this.prisma).getPointsdict(
-        userId,
-      );
-      const xp = pointsResult && pointsResult.data ? pointsResult.data : 0;
+      const pointsResult = await calculateUserDigPoints(this.prisma, userId);
+      const xp = pointsResult ?? 0;
 
       const permissions=await SubscriptionManager(this.prisma,userId);
 

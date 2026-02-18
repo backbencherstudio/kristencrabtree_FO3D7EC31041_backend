@@ -22,11 +22,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://jwjx6rz5-3001.inc1.devtunnels.ms/'],
     credentials: true,
   });
   app.use(helmet());
-  
+
   // Enable it, if special charactrers not encoding perfectly
   // app.use((req, res, next) => {
   //   // Only force content-type for specific API routes, not Swagger or assets
