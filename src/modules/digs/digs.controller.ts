@@ -3,6 +3,7 @@ import { DigsService } from './digs.service';
 import { CreateDigDto } from './dto/create-dig.dto';
 import { UpdateDigDto } from './dto/update-dig.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
 @Controller('digs')
 export class DigsController {
   constructor(private readonly digsService: DigsService) {}
