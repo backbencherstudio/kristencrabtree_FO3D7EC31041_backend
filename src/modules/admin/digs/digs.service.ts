@@ -321,68 +321,6 @@ export class DigsService {
     }
   }
 
-  async getRandom(userId) {
-    try {
-
-      // const week= getLastNDaysRange(-7)
-      // console.log(week);
-
-      const userPlan = await SubscriptionManager(this.prisma, userId);
-
-        if (userPlan.subscriptionName === 'free') {
-        const cachedRaw = await this.redis.get(`digs:daily:${userId}`);
-
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          return {
-            success: true,
-            message: 'Random admin quote retrieved',
-            data: cached,
-          };
-        }
-      }
-
-      const total = await this.prisma.digs.count({
-        where:{
-          type: {
-            hasSome: userPlan.focus_area,
-          },
-        }
-      });
-
-      if (total === 0) {
-        return {
-          success: true,
-          message: 'No Digs found',
-          data: null,
-        };
-      }
-      const randomIndex = Math.floor(Math.random() * total);
-
-      const dig = await this.prisma.digs.findFirst({
-        where: {
-          type: {
-            hasSome: userPlan.focus_area,
-          },
-        },
-        include: {
-          layers: true,
-        },
-        orderBy: { created_at: 'asc' },
-        skip: randomIndex,
-        take: 3,
-      });
-
-      return {
-        success: true,
-        message: 'Dig fetch successfull',
-        dig,
-      };
-    } catch (err) {
-      console.log(err);
-    }
-  }
-
   async updateDig(id, userId, updateDig) {
     const user = await this.prisma.user.findFirst({
       where: {

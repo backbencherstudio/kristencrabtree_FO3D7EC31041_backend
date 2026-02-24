@@ -28,31 +28,36 @@ export class JournelsService {
         return { success: false, message: 'User not found' };
       }
 
-      const checkPermission = await SubscriptionManager(this.prisma, user_id);
+      if (user.type !== 'admin') {
+        const checkPermission = await SubscriptionManager(this.prisma, user_id);
 
-      if(checkPermission.subscriptionName==='free' && createJournelDto.type === 'Audio'){
-        return{
-          success:false,
-          message:"You cant upload audio in free plan"
+        if (
+          checkPermission.subscriptionName === 'free' &&
+          createJournelDto.type === 'Audio'
+        ) {
+          return {
+            success: false,
+            message: 'You cant upload audio in free plan',
+          };
         }
-      }
-      // console.log(checkPermission);
-      // console.log(checkPermission.journal_entries);  // eita free plan hole 2 return kore ar monthly/yearly hole infinity return kore
+        // console.log(checkPermission);
+        // console.log(checkPermission.journal_entries);  // eita free plan hole 2 return kore ar monthly/yearly hole infinity return kore
 
-      if(checkPermission.journal_entries !== Infinity){
-        const journelCheck=await this.prisma.journel.count({
-          where:{
-            user_id:user_id,
-            created_at:{
-              gte: new Date(new Date().setHours(0, 0, 0, 0)), // Start of the day
-              lte: new Date(new Date().setHours(23, 59, 59, 999)), // End of the day
-            }
-          }
-        })
-        if(journelCheck >= checkPermission.journal_entries){
-          return{
-            success:false,
-            message:`Journal entry limit reached. Your current plan allows for ${checkPermission.journal_entries} entries per day. Please upgrade your subscription to add more entries.`
+        if (checkPermission.journal_entries !== Infinity) {
+          const journelCheck = await this.prisma.journel.count({
+            where: {
+              user_id: user_id,
+              created_at: {
+                gte: new Date(new Date().setHours(0, 0, 0, 0)), // Start of the day
+                lte: new Date(new Date().setHours(23, 59, 59, 999)), // End of the day
+              },
+            },
+          });
+          if (journelCheck >= checkPermission.journal_entries) {
+            return {
+              success: false,
+              message: `Journal entry limit reached. Your current plan allows for ${checkPermission.journal_entries} entries per day. Please upgrade your subscription to add more entries.`,
+            };
           }
         }
       }
@@ -181,7 +186,8 @@ export class JournelsService {
           user: {
             select: {
               id: true,
-              name: true,
+              first_name: true,
+              last_name: true,
               avatar: true,
             },
           },
@@ -207,6 +213,12 @@ export class JournelsService {
             appConfig().storageUrl.audio + '/' + item.audio,
           );
         }
+
+        // Add full name
+        item.user['name'] =
+          [item.user.first_name, item.user.last_name]
+            .filter(Boolean)
+            .join(' ') || null;
       });
 
       const result = journals.map(({ _count, likeJournels, ...journel }) => ({

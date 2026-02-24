@@ -365,6 +365,7 @@ export class DashboardService {
           digs:digs.map(dig=>({
           id:dig.id,
           title:dig.title,
+          type:dig.type
         }))
         }
       },

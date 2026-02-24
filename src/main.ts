@@ -22,8 +22,8 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://jwjx6rz5-3001.inc1.devtunnels.ms/'],
-    credentials: true,
+    origin:'*',
+    credentials: false,
   });
   app.use(helmet());
 
@@ -38,10 +38,21 @@ async function bootstrap() {
   app.useStaticAssets(path.join(process.cwd(), 'public'), {
     index: false,
     prefix: '/public',
+    setHeaders: (res) => {
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length,Content-Range');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  },
   });
   app.useStaticAssets(path.join(process.cwd(), 'public/storage'), {
     index: false,
     prefix: '/storage',
+      setHeaders: (res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Accept-Ranges', 'bytes');
+  },
   });
   app.useGlobalPipes(
     new ValidationPipe({

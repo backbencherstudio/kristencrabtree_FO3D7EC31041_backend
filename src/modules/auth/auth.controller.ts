@@ -230,21 +230,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Patch('update')
   @UseInterceptors(
-    FileInterceptor('image', {
-      // storage: diskStorage({
-      //   destination:
-      //     appConfig().storageUrl.rootUrl + appConfig().storageUrl.avatar,
-      //   filename: (req, file, cb) => {
-      //     const randomName = Array(32)
-      //       .fill(null)
-      //       .map(() => Math.round(Math.random() * 16).toString(16))
-      //       .join('');
-      //     return cb(null, `${randomName}${file.originalname}`);
-      //   },
-      // }),
-      storage: memoryStorage(),
-    }),
-  )
+  FileInterceptor('image', {
+    storage: memoryStorage(),
+  }),
+)
   async updateUser(
     @Req() req: Request,
     @Body() data: UpdateUserDto,

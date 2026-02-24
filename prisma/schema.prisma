@@ -100,8 +100,9 @@ model User {
   digs                 Digs[]
   userSubscription     UserSubscription[]
   weeklyDigs UserWeeklyDig[]
-
-  @@map("users")
+  dailyDigs  UserDailyDig[] 
+  
+    @@map("users")
 }
 
 ///////////////////////////////
@@ -770,10 +771,13 @@ model Digs {
   user_id String?
   user    User?   @relation(fields: [user_id], references: [id])
 
+  answeredCount Int?          @default(0)
+ 
   layers        Layers[]
   digResponses  DigResponse[]
-  answeredCount Int?          @default(0)
-
+  weeklyAssignments UserWeeklyDig[]
+  dailyAssignments  UserDailyDig[]
+  
   @@map("digs")
 }
 
@@ -850,6 +854,26 @@ model UserWeeklyDig {
   dig  Digs @relation(fields: [digId], references: [id])
 
   @@unique([userId, digId, weekStart])
-  @@index([userId, weekStart])
+  @@index([userId, weekStart, completed])
+  @@map("weekly_dig")
 }
 
+model UserDailyDig {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  userId         String
+  digId          String
+  assignedAt     DateTime @default(now())
+  dailyDigNumber Int      // 1 or 2 (first or second dig of that day)
+  completed      Boolean  @default(false)
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dig  Digs @relation(fields: [digId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, digId])
+  @@index([userId, completed])
+  @@index([userId, assignedAt])
+  @@map("user_daily_digs")
+}

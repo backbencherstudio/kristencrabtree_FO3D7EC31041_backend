@@ -52,7 +52,7 @@ export class AuthService {
           type: true,
           gender: true,
           date_of_birth: true,
-          subscriptionPlan:true,
+          subscriptionPlan: true,
           created_at: true,
         },
       });
@@ -64,13 +64,15 @@ export class AuthService {
       const pointsResult = await calculateUserDigPoints(this.prisma, userId);
       const xp = pointsResult ?? 0;
 
-      const permissions=await SubscriptionManager(this.prisma,userId);
+      if(user.type!=='admin'){
+        const permissions = await SubscriptionManager(this.prisma, userId);
 
-      if(!permissions){
-         return { success: false, message: 'Permission data not found' };
+      if (!permissions) {
+        return { success: false, message: 'Permission data not found' };
+      }
       }
 
-      const userData = { ...user, xp, permissions};
+      const userData = { ...user, xp };
 
       if (user.avatar) {
         userData['avatar_url'] = SojebStorage.url(
@@ -517,22 +519,26 @@ export class AuthService {
 
       if (!userPref) {
         await this.prisma.userPreferences.create({
-        data: {
-          content_preference: dto.content_preference,
-          dailyWisdomQuotes: dto.dailyWisdomQuotes,
-          guidedExercises: dto.guidedExercises,
-          meditationContent: dto.meditationContent,
-          communityDiscussions: dto.communityDiscussions,
-          journalPrompts: dto.journalPrompts,
-          scientificInsights: dto.scientificInsights,
-          focus_area: { set: dto.focus_area },
-          weekly_practice: dto.weekly_practice,
-        },
-      });
-      return {
-        success: true,
-        message: 'User preferences created successfully',
-      };
+          data: {
+            content_preference: dto.content_preference,
+            dailyWisdomQuotes: dto.dailyWisdomQuotes,
+            guidedExercises: dto.guidedExercises,
+            meditationContent: dto.meditationContent,
+            communityDiscussions: dto.communityDiscussions,
+            journalPrompts: dto.journalPrompts,
+            scientificInsights: dto.scientificInsights,
+            focus_area: {
+              set: Array.isArray(dto.focus_area)
+                ? dto.focus_area
+                : [dto.focus_area],
+            },
+            weekly_practice: dto.weekly_practice,
+          },
+        });
+        return {
+          success: true,
+          message: 'User preferences created successfully',
+        };
       }
       // if (
       //   userPref.content_preference?.length &&
@@ -576,7 +582,11 @@ export class AuthService {
           communityDiscussions: dto.communityDiscussions,
           journalPrompts: dto.journalPrompts,
           scientificInsights: dto.scientificInsights,
-          focus_area: { set: dto.focus_area },
+          focus_area: {
+            set: Array.isArray(dto.focus_area)
+              ? dto.focus_area
+              : [dto.focus_area],
+          },
           weekly_practice: dto.weekly_practice,
         },
       });
@@ -1213,7 +1223,7 @@ export class AuthService {
   }
   // --------- end 2FA ---------
 
-   async googleLogin(idToken: string) {
+  async googleLogin(idToken: string) {
     try {
       const decoded = await this.firebaseAuth.verifyIdToken(idToken);
       const { email, name, uid } = decoded;
@@ -1240,5 +1250,4 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Firebase token');
     }
   }
-
 }

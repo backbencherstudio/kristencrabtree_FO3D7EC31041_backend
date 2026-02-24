@@ -11,6 +11,7 @@ import { UserRepository } from '../../../common/repository/user/user.repository'
 import appConfig from '../../../config/app.config';
 import { SojebStorage } from '../../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../../common/helper/date.helper';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -40,31 +41,26 @@ export class UserService {
   }
 
   async findAll({
-    q,
     status,
     approved,
     joined,
+    plan,
     paginationDto,
   }: {
     q?: string;
     status?: string;
     approved?: string;
     joined?: string;
-    paginationDto:{ page: number; perPage: number };
+    plan?: string;
+    paginationDto: { page: number; perPage: number };
   }) {
     try {
       const page = paginationDto.page || 1;
       const perPage = paginationDto.perPage || 10;
       const skip = (page - 1) * perPage;
-      const take= perPage;
+      const take = perPage;
 
-      const where_condition = {};
-      if (q) {
-        where_condition['OR'] = [
-          { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-        ];
-      }
+      const where_condition: Prisma.UserWhereInput = {};
 
       if (status) {
         where_condition['status'] = parseInt(status);
@@ -83,7 +79,13 @@ export class UserService {
           lte: end,
         };
       }
-      const total= await this.prisma.user.count({
+      if (plan) {
+        where_condition.subscriptionPlan = {
+          equals: plan,
+          mode: 'insensitive',
+        };
+      }
+      const total = await this.prisma.user.count({
         where: {
           ...where_condition,
           type: 'user',
@@ -108,18 +110,19 @@ export class UserService {
           approved_at: true,
           created_at: true,
           updated_at: true,
+          subscriptionPlan: true,
         },
       });
 
       return {
         success: true,
         data: users,
-        pagination:{
+        pagination: {
           total,
           page,
           perPage,
           totalPages: Math.ceil(total / perPage),
-        }
+        },
       };
     } catch (error) {
       return {
@@ -295,5 +298,4 @@ export class UserService {
       message: 'User status updated successfully',
     };
   }
-  
 }

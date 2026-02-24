@@ -94,5 +94,6 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     description: 'Date of birth',
     example: '14/11/2001',
   })
-  confirm_password?: string;
+  confirm_password?: string; 
+
 }

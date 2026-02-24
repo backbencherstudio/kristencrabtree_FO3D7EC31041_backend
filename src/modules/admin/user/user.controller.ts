@@ -44,14 +44,14 @@ export class UserController {
 
   @ApiResponse({ description: 'Get all users' })
   @Get()
-  async findAll(@Query() query: { q?: string; status?: string; approved?: string, joined?:string}, @Query() paginationDto: PaginationDto) {
+  async findAll(@Query() query: { status?: string; approved?: string, joined?:string; plan?:string}, @Query() paginationDto: PaginationDto) {
     try {
-      const q = query.q;
+      const plan= query.plan;
       const status = query.status;
       const approved = query.approved;
       const joined= query.joined
 
-      const users = await this.userService.findAll({ q, status, approved, joined, paginationDto });
+      const users = await this.userService.findAll({ plan, status, approved, joined, paginationDto });
       return users;
     } catch (error) {
       return {

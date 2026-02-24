@@ -233,7 +233,7 @@ export class StripeController {
           },
         });
 
-        console.log(accessPlan);
+        // console.log(accessPlan);
 
         // Create payment transaction
         await tx.paymentTransaction.create({
