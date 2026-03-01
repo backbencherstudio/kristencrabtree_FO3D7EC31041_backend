@@ -9,14 +9,14 @@ function getWeekBoundaries(date: Date = new Date()) {
   const current = new Date(date);
   const day = current.getDay();
   const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
-  
+
   const weekStart = new Date(current.setDate(diff));
   weekStart.setHours(0, 0, 0, 0);
-  
+
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
-  
+
   return { weekStart, weekEnd };
 }
 
@@ -40,7 +40,12 @@ export class DigsService {
           message: 'User Not found',
         };
       }
+      const isProductionMode = process.env.PRODUCTION_MODE === 'true';
 
+      if (!isProductionMode) {
+        // ✅ Development mode - generate random dig immediately
+        return await this.generateRandomDig(userId);
+      }
       const userPlan = await SubscriptionManager(this.prisma, userId);
 
       if (userPlan.focus_area.length === 0) {
@@ -55,7 +60,12 @@ export class DigsService {
 
       if (isFreeUser) {
         // FREE USER: 3 digs per week
-        return await this.handleFreeUserDigs(userId, userPlan, weekStart, weekEnd);
+        return await this.handleFreeUserDigs(
+          userId,
+          userPlan,
+          weekStart,
+          weekEnd,
+        );
       } else {
         // PAID USER: Sequential 2 digs per day (must complete previous to unlock next)
         return await this.handlePaidUserDigs(userId, userPlan);
@@ -79,7 +89,7 @@ export class DigsService {
     // Check cache first
     const cacheKey = `digs:weekly:${userId}:${weekStart.getTime()}`;
     const cachedDigs = await this.redis.get(cacheKey);
-    
+
     if (cachedDigs) {
       const parsed = JSON.parse(cachedDigs);
       return {
@@ -106,18 +116,20 @@ export class DigsService {
     });
 
     // Check if all 3 digs are completed
-    const allCompleted = weeklyDigs.length === 3 && weeklyDigs.every(d => d.completed);
+    const allCompleted =
+      weeklyDigs.length === 3 && weeklyDigs.every((d) => d.completed);
 
     if (allCompleted) {
       const responseData = {
-        digs: weeklyDigs.map(wd => wd.dig),
+        digs: weeklyDigs.map((wd) => wd.dig),
         allCompleted: true,
         nextWeekStart: new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000),
       };
 
       return {
         success: true,
-        message: 'All weekly digs completed. New digs will be available next week.',
+        message:
+          'All weekly digs completed. New digs will be available next week.',
         data: responseData,
       };
     }
@@ -125,18 +137,25 @@ export class DigsService {
     // If we have existing digs for this week, return them
     if (weeklyDigs.length > 0) {
       const digsData = {
-        digs: weeklyDigs.map(wd => ({
+        digs: weeklyDigs.map((wd) => ({
           ...wd.dig,
           completed: wd.completed,
           position: wd.position,
         })),
         allCompleted: false,
-        completedCount: weeklyDigs.filter(d => d.completed).length,
+        completedCount: weeklyDigs.filter((d) => d.completed).length,
       };
 
       // Cache until end of week
-      const secondsUntilWeekEnd = Math.floor((weekEnd.getTime() - Date.now()) / 1000);
-      await this.redis.set(cacheKey, JSON.stringify(digsData), 'EX', secondsUntilWeekEnd);
+      const secondsUntilWeekEnd = Math.floor(
+        (weekEnd.getTime() - Date.now()) / 1000,
+      );
+      await this.redis.set(
+        cacheKey,
+        JSON.stringify(digsData),
+        'EX',
+        secondsUntilWeekEnd,
+      );
 
       return {
         success: true,
@@ -152,8 +171,8 @@ export class DigsService {
           hasSome: userPlan.focus_area,
         },
       },
-      orderBy:{
-        created_at:'desc'
+      orderBy: {
+        created_at: 'desc',
       },
       include: {
         layers: true,
@@ -198,8 +217,15 @@ export class DigsService {
     };
 
     // Cache until end of week
-    const secondsUntilWeekEnd = Math.floor((weekEnd.getTime() - Date.now()) / 1000);
-    await this.redis.set(cacheKey, JSON.stringify(digsData), 'EX', secondsUntilWeekEnd);
+    const secondsUntilWeekEnd = Math.floor(
+      (weekEnd.getTime() - Date.now()) / 1000,
+    );
+    await this.redis.set(
+      cacheKey,
+      JSON.stringify(digsData),
+      'EX',
+      secondsUntilWeekEnd,
+    );
 
     return {
       success: true,
@@ -228,7 +254,7 @@ export class DigsService {
     // If there are incomplete digs, return them (block new digs)
     if (incompleteDigs.length > 0) {
       const responseData = {
-        digs: incompleteDigs.map(ud => ({
+        digs: incompleteDigs.map((ud) => ({
           ...ud.dig,
           completed: ud.completed,
           assignedAt: ud.assignedAt,
@@ -272,7 +298,7 @@ export class DigsService {
         success: false,
         message: 'Daily dig limit reached. You can get more digs tomorrow.',
         data: {
-          digs: todayDigs.map(ud => ({
+          digs: todayDigs.map((ud) => ({
             ...ud.dig,
             completed: ud.completed,
             dailyDigNumber: ud.dailyDigNumber,
@@ -308,7 +334,8 @@ export class DigsService {
     if (availableDigs.length === 0) {
       return {
         success: false,
-        message: 'No new digs available. You may have completed all available digs.',
+        message:
+          'No new digs available. You may have completed all available digs.',
       };
     }
 
@@ -337,7 +364,7 @@ export class DigsService {
     const allToday = [...todayDigs, newDailyDig];
 
     const responseData = {
-      digs: allToday.map(ud => ({
+      digs: allToday.map((ud) => ({
         ...ud.dig,
         completed: ud.completed,
         assignedAt: ud.assignedAt,
@@ -450,7 +477,7 @@ export class DigsService {
 
       if (isFreeUser) {
         const { weekStart } = getWeekBoundaries();
-        
+
         const weeklyDigs = await this.prisma.userWeeklyDig.findMany({
           where: { userId, weekStart },
         });
@@ -460,8 +487,9 @@ export class DigsService {
           data: {
             type: 'free',
             totalThisWeek: weeklyDigs.length,
-            completedThisWeek: weeklyDigs.filter(d => d.completed).length,
-            allCompleted: weeklyDigs.length === 3 && weeklyDigs.every(d => d.completed),
+            completedThisWeek: weeklyDigs.filter((d) => d.completed).length,
+            allCompleted:
+              weeklyDigs.length === 3 && weeklyDigs.every((d) => d.completed),
           },
         };
       } else {
@@ -487,7 +515,7 @@ export class DigsService {
           data: {
             type: 'paid',
             totalToday: todayDigs.length,
-            completedToday: todayDigs.filter(d => d.completed).length,
+            completedToday: todayDigs.filter((d) => d.completed).length,
             remainingToday: Math.max(0, 2 - todayDigs.length),
             hasIncomplete: incompleteDigs > 0,
             incompleteCount: incompleteDigs,
@@ -499,6 +527,54 @@ export class DigsService {
       return {
         success: false,
         message: 'Failed to get dig progress',
+      };
+    }
+  }
+
+  private async generateRandomDig(userId: string) {
+    try {
+      // Get total count
+      const total = await this.prisma.digs.count();
+
+      if (total === 0) {
+        return {
+          success: false,
+          message: 'No digs available',
+        };
+      }
+
+      // Get random dig
+      const randomIndex = Math.floor(Math.random() * total);
+
+      const dig = await this.prisma.digs.findFirst({
+        skip: randomIndex,
+        take: 1,
+        include: {
+          layers: true,
+        },
+      });
+
+      if (!dig) {
+        return {
+          success: false,
+          message: 'No dig found',
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Random dig fetched (Development Mode)',
+        data: {
+          digs: [dig],
+          mode: 'development',
+        },
+      };
+    } catch (error) {
+      console.error('Error generating random dig:', error);
+      return {
+        success: false,
+        message: 'Failed to generate random dig',
+        error: error.message,
       };
     }
   }

@@ -31,3 +31,10 @@ export async function calculateUserDigPoints(
 
   return totalPoints;
 }
+
+/** XP ranges: 0–80 → 1, 81–180 → 2, 181+ → 3 */
+export function getLevelFromTotalXp(totalXp: number): number {
+  if (totalXp <= 80) return 1;
+  if (totalXp <= 180) return 2;
+  return 2 + Math.ceil((totalXp - 180) / 100);
+}

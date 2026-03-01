@@ -24,6 +24,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { GoogleLoginDto } from './dto/google-login.dto';
+import { AppleAuthGuard } from './guards/apple.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -195,7 +196,7 @@ export class AuthController {
     }
   }
 
-    @Post('google')
+  @Post('google')
   async googleLogin(@Body() dto: GoogleLoginDto) {
     const { user, token } = await this.authService.googleLogin(dto.token);
     // Remove sensitive fields if any
@@ -206,8 +207,6 @@ export class AuthController {
       token,
     };
   }
-
-
 
   // @Get('google')
   // @UseGuards(AuthGuard('google'))
@@ -224,16 +223,44 @@ export class AuthController {
     };
   }
 
+  //  @Get('apple')
+  // @UseGuards(AppleAuthGuard)
+  // async appleAuth(@Req() req) {
+  //   return HttpStatus.OK;
+  // }
+
+  // @Get('apple/redirect')
+  // @UseGuards(AppleAuthGuard)
+  // async appleAuthRedirect(@Req() req, @Res() res: Response) {
+  //   const { user, loginResponse } = req.user;
+
+  //   return res.json({
+  //     message: 'Logged in successfully via Apple',
+  //     authorization: loginResponse.authorization,
+  //     user: {
+  //       email: user.email,
+  //       first_name: user.first_name,
+  //       last_name: user.last_name,
+  //       avatar: user.avatar,
+  //     },
+  //   });
+  // }
+
+  @Post('apple')
+  async appleLogin(@Body('idToken') idToken: string) {
+    return this.authService.appleLogin(idToken);
+  }
+
   // update user
   @ApiOperation({ summary: 'Update user' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Patch('update')
   @UseInterceptors(
-  FileInterceptor('image', {
-    storage: memoryStorage(),
-  }),
-)
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+    }),
+  )
   async updateUser(
     @Req() req: Request,
     @Body() data: UpdateUserDto,

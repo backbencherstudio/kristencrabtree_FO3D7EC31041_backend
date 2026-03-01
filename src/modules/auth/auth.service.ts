@@ -25,7 +25,7 @@ import { DigsService } from '../admin/digs/digs.service';
 import * as bcrypt from 'bcrypt';
 import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 import { calculateUserDigPoints } from './helper';
-
+import admin from 'src/config/firebase-admin';
 @Injectable()
 export class AuthService {
   constructor(
@@ -51,6 +51,8 @@ export class AuthService {
           phone_number: true,
           type: true,
           gender: true,
+          totalXp:true,
+          currentLevel:true,
           date_of_birth: true,
           subscriptionPlan: true,
           created_at: true,
@@ -61,8 +63,8 @@ export class AuthService {
         return { success: false, message: 'User not found' };
       }
 
-      const pointsResult = await calculateUserDigPoints(this.prisma, userId);
-      const xp = pointsResult ?? 0;
+      // const pointsResult = await calculateUserDigPoints(this.prisma, userId);
+      // const xp = pointsResult ?? 0;
 
       if(user.type!=='admin'){
         const permissions = await SubscriptionManager(this.prisma, userId);
@@ -72,8 +74,7 @@ export class AuthService {
       }
       }
 
-      const userData = { ...user, xp };
-
+      const userData = { ...user}
       if (user.avatar) {
         userData['avatar_url'] = SojebStorage.url(
           appConfig().storageUrl.avatar + user.avatar,
@@ -295,6 +296,126 @@ export class AuthService {
       };
     }
   }
+
+  // async appleLogin({
+  //   email,
+  //   userId,
+  //   aud,
+  // }: {
+  //   email: string;
+  //   userId: string;
+  //   aud: string;
+  // }) {
+  //   try {
+  //     const payload = { email, sub: userId, aud };
+ 
+  //     const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+  //     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+ 
+  //     const user = await UserRepository.getUserDetails(userId);
+ 
+  //     // await this.redis.set(
+  //     //   refresh_token:${user.id},
+  //     //   refreshToken,
+  //     //   'EX',
+  //     //   60 * 60 * 24 * 7,
+  //     // );
+ 
+  //     // create stripe customer account id
+  //     try {
+  //       const stripeCustomer = await StripePayment.createCustomer({
+  //         user_id: user.id,
+  //         email: user.email,
+  //         name:`${user.first_name} ${user.last_name}`,
+  //       });
+ 
+  //       if (stripeCustomer) {
+  //         await this.prisma.user.update({
+  //           where: { id: user.id },
+  //           data: { billing_id: stripeCustomer.id },
+  //         });
+  //       }
+  //     } catch (error) {
+  //       return {
+  //         success: false,
+  //         message: 'User created but failed to create billing account',
+  //       };
+  //     }
+ 
+  //     return {
+  //       message: 'Logged in successfully',
+  //       authorization: {
+  //         type: 'bearer',
+  //         access_token: accessToken,
+  //         refresh_token: refreshToken,
+  //       },
+  //       type: user.type,
+  //     };
+  //   } catch (error) {
+  //     return { success: false, message: error.message };
+  //   }
+  // }
+
+async appleLogin(idToken: string) {
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+    const { uid, email, name } = decodedToken;
+
+    if (!email) {
+      return {
+        success: false,
+        message: 'Apple did not provide email',
+      };
+    }
+
+    let user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          firebaseUid: uid,
+          first_name: name?.split(' ')[0] || '',
+          last_name: name?.split(' ')[1] || '',
+          type: 'user',
+        },
+      });
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: '1h',
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
+
+    return {
+      success: true,
+      message: 'Logged in successfully via Apple',
+      authorization: {
+        type: 'bearer',
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      },
+      user,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Invalid Firebase token',
+      error: error.message,
+    };
+  }
+}
 
   async refreshToken(user_id: string, refreshToken: string) {
     try {

@@ -74,10 +74,14 @@ model User {
   creator_conversations         Conversation[] @relation("creator")
   participant_conversations     Conversation[] @relation("participant")
   receiver_messages             Message[]      @relation("receiver")
+
   sender_messages               Message[]      @relation("sender")
   receiver_notifications        Notification[] @relation("receiver")
   sender_notifications          Notification[] @relation("sender")
   firebaseUid                   String?
+  apple_id      String?
+  currentLevel Int? @default(0)
+  totalXp Int? @default(0)
 
   user_payment_methods UserPaymentMethod[]
   user_settings        UserSetting[]
