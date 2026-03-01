@@ -277,13 +277,13 @@ async saveUserResponses(
     }
         // Update user totalXp and level (only for non-admin users)
         if (user.type !== 'admin' && totalPoints > 0) {
-          const currentTotalXp = user.totalXp ?? 0;
+          const currentTotalXp = user.acheivedXp ?? 0;
           const newTotalXp = currentTotalXp + totalPoints;
           const newLevel = getLevelFromTotalXp(newTotalXp);
           await this.prisma.user.update({
             where: { id: userId },
             data: {
-              totalXp: newTotalXp,
+              acheivedXp: newTotalXp,
               currentLevel:newLevel,
             },
           });

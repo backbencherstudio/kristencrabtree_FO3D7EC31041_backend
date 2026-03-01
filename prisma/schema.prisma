@@ -81,7 +81,7 @@ model User {
   firebaseUid                   String?
   apple_id      String?
   currentLevel Int? @default(0)
-  totalXp Int? @default(0)
+  acheivedXp Int? @default(0)
 
   user_payment_methods UserPaymentMethod[]
   user_settings        UserSetting[]

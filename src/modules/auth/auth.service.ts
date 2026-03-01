@@ -24,7 +24,7 @@ import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 import { DigsService } from '../admin/digs/digs.service';
 import * as bcrypt from 'bcrypt';
 import { SubscriptionManager } from 'src/common/helper/subscription.manager';
-import { calculateUserDigPoints } from './helper';
+import { calculateUserDigPoints, getLevelXpRange } from './helper';
 import admin from 'src/config/firebase-admin';
 @Injectable()
 export class AuthService {
@@ -51,11 +51,11 @@ export class AuthService {
           phone_number: true,
           type: true,
           gender: true,
-          totalXp:true,
-          currentLevel:true,
           date_of_birth: true,
           subscriptionPlan: true,
           created_at: true,
+          currentLevel: true,
+          acheivedXp: true,
         },
       });
 
@@ -66,20 +66,26 @@ export class AuthService {
       // const pointsResult = await calculateUserDigPoints(this.prisma, userId);
       // const xp = pointsResult ?? 0;
 
-      if(user.type!=='admin'){
+      if (user.type !== 'admin') {
         const permissions = await SubscriptionManager(this.prisma, userId);
 
-      if (!permissions) {
-        return { success: false, message: 'Permission data not found' };
-      }
+        if (!permissions) {
+          return { success: false, message: 'Permission data not found' };
+        }
       }
 
-      const userData = { ...user}
+      const userData = { ...user };
       if (user.avatar) {
         userData['avatar_url'] = SojebStorage.url(
           appConfig().storageUrl.avatar + user.avatar,
         );
       }
+
+      // Current level XP range (for progress / "total xp of current level")
+      const level = user.currentLevel ? (user.currentLevel) : 1;
+      const levelXp = getLevelXpRange(level);
+      userData['currentLevelMinXp'] = levelXp.minXp;
+      userData['currentLevelMaxXp'] = levelXp.maxXp;
 
       return { success: true, data: userData };
     } catch (error) {
@@ -308,19 +314,19 @@ export class AuthService {
   // }) {
   //   try {
   //     const payload = { email, sub: userId, aud };
- 
+
   //     const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
   //     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
- 
+
   //     const user = await UserRepository.getUserDetails(userId);
- 
+
   //     // await this.redis.set(
   //     //   refresh_token:${user.id},
   //     //   refreshToken,
   //     //   'EX',
   //     //   60 * 60 * 24 * 7,
   //     // );
- 
+
   //     // create stripe customer account id
   //     try {
   //       const stripeCustomer = await StripePayment.createCustomer({
@@ -328,7 +334,7 @@ export class AuthService {
   //         email: user.email,
   //         name:`${user.first_name} ${user.last_name}`,
   //       });
- 
+
   //       if (stripeCustomer) {
   //         await this.prisma.user.update({
   //           where: { id: user.id },
@@ -341,7 +347,7 @@ export class AuthService {
   //         message: 'User created but failed to create billing account',
   //       };
   //     }
- 
+
   //     return {
   //       message: 'Logged in successfully',
   //       authorization: {
@@ -356,66 +362,66 @@ export class AuthService {
   //   }
   // }
 
-async appleLogin(idToken: string) {
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+  async appleLogin(idToken: string) {
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
 
-    const { uid, email, name } = decodedToken;
+      const { uid, email, name } = decodedToken;
 
-    if (!email) {
+      if (!email) {
+        return {
+          success: false,
+          message: 'Apple did not provide email',
+        };
+      }
+
+      let user = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            firebaseUid: uid,
+            first_name: name?.split(' ')[0] || '',
+            last_name: name?.split(' ')[1] || '',
+            type: 'user',
+          },
+        });
+      }
+
+      const payload = {
+        sub: user.id,
+        email: user.email,
+      };
+
+      const accessToken = this.jwtService.sign(payload, {
+        expiresIn: '1h',
+      });
+
+      const refreshToken = this.jwtService.sign(payload, {
+        expiresIn: '7d',
+      });
+
+      return {
+        success: true,
+        message: 'Logged in successfully via Apple',
+        authorization: {
+          type: 'bearer',
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        },
+        user,
+      };
+    } catch (error) {
       return {
         success: false,
-        message: 'Apple did not provide email',
+        message: 'Invalid Firebase token',
+        error: error.message,
       };
     }
-
-    let user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          email,
-          firebaseUid: uid,
-          first_name: name?.split(' ')[0] || '',
-          last_name: name?.split(' ')[1] || '',
-          type: 'user',
-        },
-      });
-    }
-
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
-
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '1h',
-    });
-
-    const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: '7d',
-    });
-
-    return {
-      success: true,
-      message: 'Logged in successfully via Apple',
-      authorization: {
-        type: 'bearer',
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      },
-      user,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Invalid Firebase token',
-      error: error.message,
-    };
   }
-}
 
   async refreshToken(user_id: string, refreshToken: string) {
     try {

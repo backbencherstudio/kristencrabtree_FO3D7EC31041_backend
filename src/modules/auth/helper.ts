@@ -38,3 +38,15 @@ export function getLevelFromTotalXp(totalXp: number): number {
   if (totalXp <= 180) return 2;
   return 2 + Math.ceil((totalXp - 180) / 100);
 }
+
+/** Returns min/max XP and total XP span for a level (for progress display). */
+export function getLevelXpRange(level: number): {
+  minXp: number;
+  maxXp: number;
+} {
+  if (level <= 1) return { minXp: 0, maxXp: 80 };
+  if (level === 2) return { minXp: 81, maxXp: 180};
+  const minXp = 181 + (level - 3) * 100;
+  const maxXp = minXp + 99;
+  return { minXp, maxXp};
+}
