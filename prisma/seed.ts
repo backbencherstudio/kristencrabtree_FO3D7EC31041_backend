@@ -42,7 +42,13 @@ async function main() {
   ];
 
   for (const permissionGroup of permissionGroups) {
-    const scope = permissionGroup['scope'] || ['read', 'create', 'update', 'show', 'delete'];
+    const scope = permissionGroup['scope'] || [
+      'read',
+      'create',
+      'update',
+      'show',
+      'delete',
+    ];
     for (const permission of scope) {
       permissions.push({
         id: String(++i),
@@ -58,16 +64,30 @@ async function main() {
 
   // Seed user
   console.log('Seeding user...');
-  const hashedPassword = await bcrypt.hash('12356', 10);
-  
+  const hashedPassword = await bcrypt.hash('12345678', 10);
+
   const systemUser = await prisma.user.create({
     data: {
       username: 'admin',
-      email: 'admin@example.com',
+      email: 'admin@gmail.com',
       password: hashedPassword,
+      type: 'admin',
     },
   });
   console.log('✓ User created with ID:', systemUser.id);
+
+  const normalUser = await prisma.user.upsert({
+  where: { email: 'user@gmail.com' },
+  update: {},
+  create: {
+    username: 'user',
+    email: 'user@gmail.com',
+    password: hashedPassword,
+    type: 'user',
+  },
+});
+
+console.log('✓ Normal user created:', normalUser.id);
 
   // Assign role to user
   await prisma.roleUser.create({
@@ -84,9 +104,9 @@ async function main() {
 
   // Super admin permissions
   const su_admin_permissions = all_permissions.filter(
-    (p) => p.title.substring(0, 25) === 'system_tenant_management_'
+    (p) => p.title.substring(0, 25) === 'system_tenant_management_',
   );
-  
+
   if (su_admin_permissions.length > 0) {
     await prisma.permissionRole.createMany({
       data: su_admin_permissions.map((p) => ({
@@ -98,9 +118,9 @@ async function main() {
 
   // Admin permissions
   const project_admin_permissions = all_permissions.filter(
-    (p) => p.title.substring(0, 25) !== 'system_tenant_management_'
+    (p) => p.title.substring(0, 25) !== 'system_tenant_management_',
   );
-  
+
   if (project_admin_permissions.length > 0) {
     await prisma.permissionRole.createMany({
       data: project_admin_permissions.map((p) => ({
