@@ -376,7 +376,11 @@ export class ContentManagementService {
       const favorites = await this.prisma.favoriteMeditation.findMany({
         where: { user_id: userId },
         include: {
-          meditation: true,
+          meditation: {
+            include: {
+              _count: true
+            },
+          },
         },
       });
       if (favorites.length === 0) {
@@ -386,10 +390,21 @@ export class ContentManagementService {
           data: [],
         };
       }
+      const data = favorites.map((favorite) => ({
+        ...favorite,
+        meditation: {
+          ...favorite.meditation,
+          listenersCount: favorite.meditation._count.listeners,
+          meditation_audio: SojebStorage.url(
+            appConfig().storageUrl.audio + favorite.meditation.meditation_audio,
+          ),
+        },
+      }));
+      
       return {
         success: true,
         message: 'Favorite meditations retrieved successfully',
-        data: favorites,
+        data: data,
       };
     } catch (error) {
       throw error;
