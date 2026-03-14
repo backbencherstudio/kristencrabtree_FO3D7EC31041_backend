@@ -21,6 +21,53 @@ export class StripeService {
     return StripePayment.handleWebhook(rawBody, sig);
   }
 
+  async createStripeProduct(params: {
+    title: string;
+    description?: string;
+    price: number; // in cents, e.g. 999 = $9.99
+    currency?: string; // default: 'usd'
+    interval?: 'month' | 'year' | 'one_time';
+  }): Promise<{
+    stripe_product_id: string;
+    stripe_price_id: string;
+  }> {
+    const {
+      title,
+      description,
+      price,
+      currency = 'usd',
+      interval = 'month',
+    } = params;
+
+    // 1. Create Stripe Product
+    const product = await this.stripe.products.create({
+      name: title,
+      ...(description && { description }),
+    });
+
+    // 2. Create Stripe Price under that product
+    const priceData: Stripe.PriceCreateParams =
+      interval === 'one_time'
+        ? {
+            product: product.id,
+            unit_amount: price,
+            currency,
+          }
+        : {
+            product: product.id,
+            unit_amount: price,
+            currency,
+            recurring: { interval },
+          };
+
+    const stripePrice = await this.stripe.prices.create(priceData);
+
+    return {
+      stripe_product_id: product.id,
+      stripe_price_id: stripePrice.id,
+    };
+  }
+
   async ensureCustomerForUser(userId: string): Promise<string> {
     try {
       const user = await this.prisma.user.findUnique({

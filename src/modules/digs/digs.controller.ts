@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req, Query } from '@nestjs/common';
 import { DigsService } from './digs.service';
 // import { CreateDigDto } from './dto/create-dig.dto';
 // import { UpdateDigDto } from './dto/update-dig.dto';
@@ -10,8 +10,8 @@ export class DigsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('getRandomDig')
-  async getRandomDig(@Req() req: any) {
+  async getRandomDig(@Req() req: any, @Query('searchTerm') search?: string) {
     const userId = req.user.userId;
-    return await this.digsService.getRandom(userId);
+    return await this.digsService.getRandom(userId, search);
   }
 }

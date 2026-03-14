@@ -28,38 +28,37 @@ export class DigsService {
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
-  async getRandom(userId: string) {
+  async getRandom(userId: string, search?: string) {
     try {
       const user = await this.prisma.user.findFirst({
         where: { id: userId },
       });
 
       if (!user) {
-        return {
-          success: false,
-          message: 'User Not found',
-        };
+        return { success: false, message: 'User Not found' };
       }
+
+      // ── Search: bypass all plan/quota logic ──────────────────
+      if (search?.trim()) {
+        return await this.searchDigs(search.trim());
+      }
+
       const isProductionMode = process.env.PRODUCTION_MODE === 'true';
 
       if (!isProductionMode) {
-        // ✅ Development mode - generate random dig immediately
         return await this.generateRandomDig(userId);
       }
+
       const userPlan = await SubscriptionManager(this.prisma, userId);
 
       if (userPlan.focus_area.length === 0) {
-        return {
-          success: false,
-          message: 'User has no saved preferences',
-        };
+        return { success: false, message: 'User has no saved preferences' };
       }
 
       const isFreeUser = userPlan.subscriptionName === 'free';
       const { weekStart, weekEnd } = getWeekBoundaries();
 
       if (isFreeUser) {
-        // FREE USER: 3 digs per week
         return await this.handleFreeUserDigs(
           userId,
           userPlan,
@@ -67,7 +66,6 @@ export class DigsService {
           weekEnd,
         );
       } else {
-        // PAID USER: Sequential 2 digs per day (must complete previous to unlock next)
         return await this.handlePaidUserDigs(userId, userPlan);
       }
     } catch (err) {
@@ -78,6 +76,25 @@ export class DigsService {
         error: err.message,
       };
     }
+  }
+
+  // ── searchDigs ────────────────────────────────────────────
+  private async searchDigs(search: string) {
+    const results = await this.prisma.digs.findMany({
+      where: {
+        OR: [{ title: { contains: search, mode: 'insensitive' } }],
+      },
+      include: { layers: true },
+      orderBy: { created_at: 'desc' },
+      take: 20,
+    });
+
+    return {
+      success: true,
+      data: { digs: results },
+      count: results.length,
+      query: search,
+    };
   }
 
   private async handleFreeUserDigs(

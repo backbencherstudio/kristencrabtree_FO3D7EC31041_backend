@@ -13,24 +13,24 @@ import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 import { getLastNDaysRange } from '../dashboard/helper.utils';
 import { getLevelFromTotalXp } from 'src/modules/auth/helper';
 
-
 function getWeekBoundaries(date: Date = new Date()) {
   const current = new Date(date);
   const day = current.getDay();
   const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
-  
+
   const weekStart = new Date(current.setDate(diff));
   weekStart.setHours(0, 0, 0, 0);
-  
+
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
-  
+
   return { weekStart, weekEnd };
 }
 @Injectable()
 export class DigsService {
-  constructor(private readonly prisma: PrismaService,
+  constructor(
+    private readonly prisma: PrismaService,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -52,10 +52,12 @@ export class DigsService {
         };
       }
 
+      console.log(createDigDto.type)
+
       const createdDig = await this.prisma.digs.create({
         data: {
           title: createDigDto.title,
-          type: { set: createDigDto.type },
+          type: { set: createDigDto.type ?? [] }, // ← default to [] if not sent
           user_id: userid,
           layers: {
             create: createDigDto.layers.map((layer) => ({
@@ -63,16 +65,15 @@ export class DigsService {
               question_type: layer.question_type,
               point: layer.point,
               question: layer.question,
-              options: layer.options || [],
-              other: layer.other,
+              options: layer.options ?? [],
+              other: layer.other ?? false,
               other_text: layer.other_text,
               text: layer.text,
+              user_id: userid, // ← also missing, Layers has user_id
             })),
           },
         },
-        include: {
-          layers: true,
-        },
+        include: { layers: true },
       });
 
       return {
@@ -88,107 +89,125 @@ export class DigsService {
     }
   }
 
-async saveUserResponses(
-  userId: string,
-  digId: string,
-  createdResponses: SaveResponseItemDto[],
-) {
-  try {
+  async saveUserResponses(
+    userId: string,
+    digId: string,
+    createdResponses: SaveResponseItemDto[],
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) return { success: false, message: 'User not found' };
 
-    const dig = await this.prisma.digs.findUnique({ 
+    const dig = await this.prisma.digs.findUnique({
       where: { id: digId },
       include: {
         layers: {
-          select: { id: true }
-        }
-      }
+          where: { deleted_at: null }, // ← only active layers, matches your schema
+          select: { id: true },
+        },
+      },
     });
     if (!dig) return { success: false, message: 'Dig not found' };
 
-    // ✅ Check if user has already completed ALL layers for this dig
-    const existingResponses = await this.prisma.digResponse.findMany({
-      where: { 
-        dig_id: digId, 
-        user_id: userId 
-      },
-      select: { layer_id: true }
-    });
-
-    // If user has responses for all layers, they've completed the dig
     const totalLayers = dig.layers.length;
-    const completedLayers = existingResponses.length;
-
-    if (completedLayers >= totalLayers) {
+    if (totalLayers === 0) {
       return {
         success: false,
-        message: 'You have already completed this dig',
+        message: 'This dig has no active layers configured.',
       };
     }
 
     const layerIds = createdResponses.map((r) => r.layer_id);
 
-    // ✅ Check if user is trying to submit duplicate responses for same layers
-    const alreadyAnsweredLayers = existingResponses.map(r => r.layer_id);
-    const duplicateLayers = layerIds.filter(id => alreadyAnsweredLayers.includes(id));
-    
-    if (duplicateLayers.length > 0) {
+    const existingResponses = await this.prisma.digResponse.findMany({
+      where: { dig_id: digId, user_id: userId },
+      select: { layer_id: true },
+    });
+    const alreadyAnsweredLayerIds = existingResponses.map((r) => r.layer_id);
+    const completedLayers = alreadyAnsweredLayerIds.length;
+
+    if (completedLayers >= totalLayers) {
       return {
         success: false,
-        message: 'You have already answered some of these questions',
+        message: 'You have already completed this dig.',
       };
     }
 
-    const layers = await this.prisma.layers.findMany({
-      where: { id: { in: layerIds }, dig_id: digId },
-      select: { id: true, question_type: true, options: true, other: true },
-    });
-
-    if (layers.length !== layerIds.length)
+    // Block re-submitting already answered layers
+    const duplicateLayers = layerIds.filter((id) =>
+      alreadyAnsweredLayerIds.includes(id),
+    );
+    if (duplicateLayers.length > 0) {
       return {
         success: false,
-        message: 'One or more layers do not belong to this dig',
+        message: `You have already answered ${duplicateLayers.length} of these layer(s). Submit only unanswered layers.`,
       };
+    }
+
+    // Validate submitted layers belong to this dig and are active (deleted_at: null)
+    const layers = await this.prisma.layers.findMany({
+      where: {
+        id: { in: layerIds },
+        dig_id: digId,
+        deleted_at: null, // ← matches your schema
+      },
+      select: {
+        id: true,
+        question_type: true,
+        options: true,
+        other: true,
+        point: true,
+      },
+    });
+
+    if (layers.length !== layerIds.length) {
+      return {
+        success: false,
+        message:
+          'One or more layers do not belong to this dig or have been deleted.',
+      };
+    }
 
     const layerMap = new Map(layers.map((l) => [l.id, l]));
 
-    // Validation logic (keep as is)
+    // Validate responses
     for (const response of createdResponses) {
       const layer = layerMap.get(response.layer_id);
       if (!layer)
         return {
           success: false,
-          message: `Layer does not belong to this dig`,
+          message: 'Layer does not belong to this dig.',
         };
 
       let options: string[] = [];
-      if (Array.isArray(layer.options)) options = layer.options;
-      else if (typeof layer.options === 'string') {
+      if (Array.isArray(layer.options)) {
+        options = layer.options as string[];
+      } else if (typeof layer.options === 'string') {
         try {
           options = JSON.parse(layer.options);
         } catch {
           return {
             success: false,
-            message: `Invalid options entered`,
+            message: 'Invalid options configuration on this layer.',
           };
         }
       }
 
       const questionType = String(layer.question_type).toLowerCase();
+
       if (questionType === 'option') {
         const normalizedOptions = options.map((o) =>
           String(o).trim().toLowerCase(),
         );
         for (const answer of response.responses) {
           const a = String(answer).trim().toLowerCase();
-          const validOption = normalizedOptions.includes(a);
+          const valid = normalizedOptions.includes(a);
           const isOther = layer.other && a.startsWith('other:');
-          if (!validOption && !isOther)
+          if (!valid && !isOther) {
             return {
               success: false,
-              message: `Invalid option entered`,
+              message: `"${answer}" is not a valid option for this question.`,
             };
+          }
         }
       }
 
@@ -196,11 +215,12 @@ async saveUserResponses(
         if (
           response.responses.length !== 1 ||
           typeof response.responses[0] !== 'string'
-        )
+        ) {
           return {
             success: false,
-            message: `Invalid text response for layer ${layer.id}`,
+            message: 'Text question requires exactly one string answer.',
           };
+        }
       }
     }
 
@@ -218,91 +238,55 @@ async saveUserResponses(
       ),
     );
 
-    // Calculate total points
-    let totalPoints = 0;
-    const layersWithPoints = await this.prisma.layers.findMany({
-      where: { id: { in: layerIds } },
-      select: { point: true },
-    });
+    // Compute points from already-fetched layers (no extra query needed)
+    const totalPoints = layers.reduce((sum, l) => sum + (l.point ?? 0), 0);
 
-    totalPoints = layersWithPoints.reduce(
-      (sum, layer) => sum + (layer.point || 0),
-      0,
-    );
-
-    // ✅ Check if user has now completed ALL layers
+    // Check completion
     const newTotalCompleted = completedLayers + savedResponses.length;
     const isDigCompleted = newTotalCompleted >= totalLayers;
 
-    // ✅ If dig is completed, mark it as complete in UserDailyDig
     if (isDigCompleted) {
       const userPlan = await SubscriptionManager(this.prisma, userId);
       const isFreeUser = userPlan.subscriptionName === 'free';
 
       if (isFreeUser) {
-        // Mark weekly dig as complete
         const { weekStart } = getWeekBoundaries();
         await this.prisma.userWeeklyDig.updateMany({
-          where: {
-            userId,
-            digId,
-            weekStart,
-          },
-          data: {
-            completed: true,
-          },
+          where: { userId, digId, weekStart },
+          data: { completed: true },
         });
       } else {
-        // Mark daily dig as complete
         await this.prisma.userDailyDig.updateMany({
-          where: {
-            userId,
-            digId,
-          },
-          data: {
-            completed: true,
-          },
+          where: { userId, digId },
+          data: { completed: true },
         });
       }
 
-      // Increment answered count only for non-admin users
       if (user.type !== 'admin') {
         await this.prisma.digs.update({
           where: { id: digId },
-          data: {
-            answeredCount: { increment: 1 },
-          },
+          data: { answeredCount: { increment: 1 } },
         });
       }
     }
-        // Update user totalXp and level (only for non-admin users)
-        if (user.type !== 'admin' && totalPoints > 0) {
-          const currentTotalXp = user.acheivedXp ?? 0;
-          const newTotalXp = currentTotalXp + totalPoints;
-          const newLevel = getLevelFromTotalXp(newTotalXp);
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              acheivedXp: newTotalXp,
-              currentLevel:newLevel,
-            },
-          });
-        }
-    return { 
-      success: true, 
-      data: savedResponses, 
-      totalPoints,
-      digCompleted: isDigCompleted, 
-      progress: `${newTotalCompleted}/${totalLayers}`
-    };
-  } catch (error) {
+
+    if (user.type !== 'admin' && totalPoints > 0) {
+      const newTotalXp = (user.acheivedXp ?? 0) + totalPoints;
+      const newLevel = getLevelFromTotalXp(newTotalXp);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { acheivedXp: newTotalXp, currentLevel: newLevel },
+      });
+    }
+
     return {
-      success: false,
-      message: 'Error saving user responses',
-      error: error.message,
+      success: true,
+      data: savedResponses,
+      totalPoints,
+      digCompleted: isDigCompleted,
+      progress: `${newTotalCompleted}/${totalLayers}`,
     };
   }
-}
 
   async getPointsdict(userId: string) {
     try {
@@ -491,5 +475,4 @@ async saveUserResponses(
       message: 'Digs deleted successfully',
     };
   }
-
 }

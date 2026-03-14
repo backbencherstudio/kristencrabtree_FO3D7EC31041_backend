@@ -1,16 +1,29 @@
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateNested, IsArray } from "class-validator";
-import { Focus_Area, Type as LayerType } from "@prisma/client";
-import { Transform, Type } from "class-transformer";
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  ValidateNested,
+  IsArray,
+} from 'class-validator';
+import { Focus_Area, Type as LayerType } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateDigDto {
   @IsString()
   title: string;
 
-  @IsOptional()
+  @IsOptional() // ← already optional ✅
   @IsArray()
   @IsEnum(Focus_Area, { each: true })
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
-  type: Focus_Area[];
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value ? [value] : [],
+  )
+  type?: Focus_Area[]; // ← add ? here
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -53,8 +66,6 @@ export class CreateLayerDto {
   @IsOptional()
   text?: string;
 }
-
-
 
 export class SaveResponseItemDto {
   @IsString()

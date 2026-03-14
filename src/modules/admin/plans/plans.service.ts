@@ -11,6 +11,7 @@ import Stripe from 'stripe';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
 import { Prisma } from '@prisma/client';
 import { MessageGateway } from 'src/modules/chat/message/message.gateway';
+import { StripeService } from 'src/modules/payment/stripe/stripe.service';
 @Injectable()
 export class PlansService {
   private stripe: Stripe;
@@ -18,21 +19,51 @@ export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly messageGateway: MessageGateway,
+    private readonly stripeService: StripeService,
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
   }
-  async createPlans(createPlanDto: CreatePlanDto) {
-    try {
-      const plan = await this.prisma.plans.create({
-        //   data: {...createPlanDto}
+  async createPlan(createPlanDto: CreatePlanDto) {
+    const {
+      title,
+      description,
+      subtitle,
+      tag,
+      features = [],
+      price_in_cents,
+      currency = 'usd',
+      interval = 'month',
+    } = createPlanDto;
+
+    // 1. Create product + price on Stripe
+    const { stripe_product_id, stripe_price_id } =
+      await this.stripeService.createStripeProduct({
+        title,
+        description,
+        price: price_in_cents,
+        currency,
+        interval,
       });
 
-      return {
-        status: 'success',
-        message: 'Plan created successfully',
-        data: plan,
-      };
-    } catch (error) {}
+    // 2. Save plan in DB with Stripe IDs
+    const plan = await this.prisma.plans.create({
+      data: {
+        title,
+        description,
+        subtitle,
+        tag,
+        features,
+        price: (price_in_cents / 100).toFixed(2), // store as readable string e.g. "9.99"
+        stripe_product_id,
+        stripe_price_id,
+      },
+    });
+
+    return {
+      status: 'success',
+      message: 'Plan created successfully',
+      data: plan,
+    };
   }
 
   async getPlans() {
@@ -150,20 +181,77 @@ export class PlansService {
   }
 
   async checkoutSession(userId: string, planId: string, confirmed?: boolean) {
-    const customerId = await this.ensureCustomerForUser(userId);
-    const plan = await this.stripe.prices.retrieve(planId);
+    // ── 1. Fetch plan from DB ──────────────────────────────────────────────
+    const plan = await this.prisma.plans.findUnique({
+      where: { id: planId },
+    });
 
     if (!plan) {
-      throw new BadRequestException('Invalid plan ID');
+      throw new NotFoundException('Plan not found');
     }
 
-    // 🟢 PHASE 1 — Create SetupIntent
+    // ── 2. Handle free plan — no Stripe involved ───────────────────────────
+    if (!plan.stripe_price_id) {
+      // Check if user already has a subscription record
+      const existingSubscription =
+        await this.prisma.userSubscription.findUnique({
+          where: { userId },
+        });
+
+      if (existingSubscription) {
+        // If they had a paid plan, cancel it on Stripe first
+        if (existingSubscription.stripeSubscriptionId) {
+          await this.stripe.subscriptions.cancel(
+            existingSubscription.stripeSubscriptionId,
+          );
+        }
+
+        // Downgrade to free
+        await this.prisma.userSubscription.update({
+          where: { userId },
+          data: {
+            planId: plan.id,
+            planName: plan.title,
+            stripeSubscriptionId: null,
+            status: 'active',
+            method: null,
+            cardLast4: null,
+          },
+        });
+      } else {
+        // First time — create free subscription record
+        await this.prisma.userSubscription.create({
+          data: {
+            userId,
+            planId: plan.id,
+            planName: plan.title,
+            status: 'active',
+          },
+        });
+      }
+
+      return {
+        step: 'FREE_PLAN_ACTIVATED',
+        message: 'Free plan activated successfully',
+      };
+    }
+
+    // ── 3. Paid plan — proceed with Stripe ────────────────────────────────
+    const customerId = await this.ensureCustomerForUser(userId);
+
+    // Verify price still exists and is active on Stripe
+    const stripePrice = await this.stripe.prices.retrieve(plan.stripe_price_id);
+    if (!stripePrice || !stripePrice.active) {
+      throw new BadRequestException('This plan is no longer available');
+    }
+
+    // ── PHASE 1 — Create SetupIntent (collect card) ────────────────────────
     if (!confirmed) {
       const setupIntent = await this.stripe.setupIntents.create({
         customer: customerId,
         usage: 'off_session',
         payment_method_types: ['card'],
-        metadata: { userId },
+        metadata: { userId, planId },
       });
 
       if (!setupIntent.client_secret) {
@@ -173,29 +261,46 @@ export class PlansService {
       return {
         step: 'SETUP_INTENT',
         clientSecret: setupIntent.client_secret,
+        plan: {
+          id: plan.id,
+          title: plan.title,
+          price: plan.price,
+        },
       };
     }
 
-    // 🟢 PHASE 2 — Create subscription (webhook will handle database writes)
+    // ── PHASE 2 — Create Stripe subscription ──────────────────────────────
     const paymentMethods = await this.stripe.paymentMethods.list({
       customer: customerId,
       type: 'card',
     });
 
     if (!paymentMethods.data.length) {
-      throw new BadRequestException('No payment method found');
+      throw new BadRequestException(
+        'No payment method found. Please complete card setup first.',
+      );
     }
 
-    // Create subscription with userId in metadata for webhook
+    // Cancel existing paid subscription if upgrading/switching plans
+    const existingSubscription = await this.prisma.userSubscription.findUnique({
+      where: { userId },
+    });
+
+    if (existingSubscription?.stripeSubscriptionId) {
+      await this.stripe.subscriptions.cancel(
+        existingSubscription.stripeSubscriptionId,
+      );
+    }
+
     const subscription = await this.stripe.subscriptions.create({
       customer: customerId,
-      items: [{ price: planId }],
+      items: [{ price: plan.stripe_price_id }], // ← use price from DB plan
       default_payment_method: paymentMethods.data[0].id,
       collection_method: 'charge_automatically',
       expand: ['latest_invoice.payment_intent'],
       metadata: {
         userId,
-        planId,
+        planId: plan.id, // ← our DB plan id, not Stripe price id
       },
     });
 
@@ -205,7 +310,7 @@ export class PlansService {
         ? ((latestInvoice as any).payment_intent as Stripe.PaymentIntent)
         : null;
 
-    // Handle 3D Secure / requires_action
+    // ── Handle 3D Secure ───────────────────────────────────────────────────
     if (paymentIntent?.status === 'requires_action') {
       return {
         step: 'REQUIRES_ACTION',
@@ -215,8 +320,7 @@ export class PlansService {
       };
     }
 
-    // ✅ No database writes here - webhook will handle everything
-    // Return subscription details immediately
+    // ✅ Webhook will handle DB writes for paid plans
     return {
       step: 'SUBSCRIPTION_CREATED',
       subscriptionId: subscription.id,

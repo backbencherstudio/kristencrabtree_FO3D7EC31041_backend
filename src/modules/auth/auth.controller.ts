@@ -61,6 +61,7 @@ export class AuthController {
       const password = data.password;
       const type = data.type;
       const is_agrred_to_terms_and_policy = data.is_agrred_to_terms_and_policy;
+      const fcm_token = data.fcm_token;
 
       if (is_agrred_to_terms_and_policy == false) {
         throw new HttpException(
@@ -94,6 +95,13 @@ export class AuthController {
         );
       }
 
+      if (!fcm_token) {
+        throw new HttpException(
+          'FCM token is required',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       const response = await this.authService.register({
         name: first_name + ' ' + last_name,
         first_name: first_name,
@@ -102,6 +110,7 @@ export class AuthController {
         password: password,
         type: type,
         is_agrred_to_terms_and_policy: is_agrred_to_terms_and_policy,
+        fcm_token,
       });
 
       return response;
@@ -128,30 +137,37 @@ export class AuthController {
   @ApiOperation({ summary: 'Login user' })
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Req() req: Request, @Res() res: Response) {
+  async login(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Body('fcm_token') fcmToken: string,
+  ) {
     try {
-      const user_id = req.user.id;
+      if (!fcmToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'fcm_token is required',
+        });
+      }
 
+      const user_id = req.user.id;
       const user_email = req.user.email;
 
       const response = await this.authService.login({
         userId: user_id,
         email: user_email,
+        fcmToken,
       });
 
-      // store to secure cookies
       res.cookie('refresh_token', response.authorization.refresh_token, {
         httpOnly: true,
         secure: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 60 * 24 * 7,
       });
 
       res.json(response);
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
   }
 

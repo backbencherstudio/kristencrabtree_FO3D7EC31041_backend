@@ -66,13 +66,13 @@ export class AuthService {
       // const pointsResult = await calculateUserDigPoints(this.prisma, userId);
       // const xp = pointsResult ?? 0;
 
-      if (user.type !== 'admin') {
-        const permissions = await SubscriptionManager(this.prisma, userId);
+      // if (user.type !== 'admin') {
+      //   const permissions = await SubscriptionManager(this.prisma, userId);
 
-        if (!permissions) {
-          return { success: false, message: 'Permission data not found' };
-        }
-      }
+      //   if (!permissions) {
+      //     return { success: false, message: 'Permission data not found' };
+      //   }
+      // }
 
       const userData = { ...user };
       if (user.avatar) {
@@ -82,7 +82,7 @@ export class AuthService {
       }
 
       // Current level XP range (for progress / "total xp of current level")
-      const level = user.currentLevel ? (user.currentLevel) : 1;
+      const level = user.currentLevel ? user.currentLevel : 1;
       const levelXp = getLevelXpRange(level);
       userData['currentLevelMinXp'] = levelXp.minXp;
       userData['currentLevelMaxXp'] = levelXp.maxXp;
@@ -268,21 +268,34 @@ export class AuthService {
     }
   }
 
-  async login({ email, userId }) {
+  async login({
+    email,
+    userId,
+    fcmToken,
+  }: {
+    email: string;
+    userId: string;
+    fcmToken: string;
+  }) {
     try {
-      const payload = { email: email, sub: userId };
-
+      const payload = { email, sub: userId };
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
       const user = await UserRepository.getUserDetails(userId);
 
-      // store refreshToken
+      // Save FCM token to user record
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { fcm_token: fcmToken },
+      });
+
+      // Store refreshToken in Redis
       await this.redis.set(
         `refresh_token:${user.id}`,
         refreshToken,
         'EX',
-        60 * 60 * 24 * 7, // 7 days in seconds
+        60 * 60 * 24 * 7,
       );
 
       return {
@@ -296,10 +309,7 @@ export class AuthService {
         type: user.type,
       };
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
   }
 
@@ -499,6 +509,7 @@ export class AuthService {
     password,
     type,
     is_agrred_to_terms_and_policy,
+    fcm_token,
   }: {
     name: string;
     first_name: string;
@@ -507,65 +518,53 @@ export class AuthService {
     password: string;
     type?: string;
     is_agrred_to_terms_and_policy: boolean;
+    fcm_token: string;
   }) {
     try {
-      // Check if email already exist
       const userEmailExist = await UserRepository.exist({
         field: 'email',
         value: String(email),
       });
-
       if (userEmailExist) {
-        return {
-          statusCode: 401,
-          message: 'Email already exist',
-        };
+        return { statusCode: 401, message: 'Email already exist' };
       }
 
       const user = await UserRepository.createUser({
         name: first_name + ' ' + last_name,
-        first_name: first_name,
-        last_name: last_name,
-        email: email,
-        password: password,
-        type: type,
-        is_agrred_to_terms_and_policy: is_agrred_to_terms_and_policy,
+        first_name,
+        last_name,
+        email,
+        password,
+        type,
+        is_agrred_to_terms_and_policy,
       });
 
       if (user == null && user.success == false) {
-        return {
-          success: false,
-          message: 'Failed to create account',
-        };
+        return { success: false, message: 'Failed to create account' };
       }
 
-      // create stripe customer account
+      // Stripe customer
       const stripeCustomer = await StripePayment.createCustomer({
         user_id: user.data.id,
-        email: email,
-        name: name,
+        email,
+        name,
       });
 
-      if (stripeCustomer) {
-        await this.prisma.user.update({
-          where: {
-            id: user.data.id,
-          },
-          data: {
-            billing_id: stripeCustomer.id,
-          },
-        });
-      }
-
-      const userPreferences = await this.prisma.userPreferences.create({
+      // Save FCM token + billing_id together in one DB call
+      await this.prisma.user.update({
+        where: { id: user.data.id },
         data: {
-          user: {
-            connect: { id: user.data.id },
-          },
+          billing_id: stripeCustomer ? stripeCustomer.id : undefined,
+          fcm_token: fcm_token,
         },
       });
 
-      //creating jwt token
+      // Remove the old separate billing_id update — replaced above
+      // if (stripeCustomer) { await this.prisma.user.update(...) }
+
+      const userPreferences = await this.prisma.userPreferences.create({
+        data: { user: { connect: { id: user.data.id } } },
+      });
 
       const payload = {
         userPrefId: userPreferences.id,
@@ -575,60 +574,20 @@ export class AuthService {
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-      // store accessToken as refresh token in redis
       await this.redis.set(
         `refresh_token:${user.data.id}`,
         refreshToken,
         'EX',
-        60 * 60 * 24 * 7, // 1 hour in seconds
+        60 * 60 * 24 * 7,
       );
-      // ----------------------------------------------------
-      // // create otp code
-      // const token = await UcodeRepository.createToken({
-      //   userId: user.data.id,
-      //   isOtp: true,
-      // });
 
-      // // send otp code to email
-      // await this.mailService.sendOtpCodeToEmail({
-      //   email: email,
-      //   name: name,
-      //   otp: token,
-      // });
-
-      // return {
-      //   success: true,
-      //   message: 'We have sent an OTP code to your email',
-      // };
-
-      // ----------------------------------------------------
-
-      // Generate verification token
-      // const token = await UcodeRepository.createVerificationToken({
-      //   userId: user.data.id,
-      //   email: email,
-      // });
-
-      // Send verification email with token
-      // await this.mailService.sendVerificationLink({
-      //   email,
-      //   name: email,
-      //   token: token.token,
-      //   type: type,
-      // });
       return {
         success: true,
         message: 'Account created successfully',
-        data: {
-          accessToken: accessToken,
-          refreshToken: refreshToken,
-        },
+        data: { accessToken, refreshToken },
       };
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
   }
 
