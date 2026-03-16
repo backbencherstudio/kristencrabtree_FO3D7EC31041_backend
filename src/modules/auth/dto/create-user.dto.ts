@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   // @IsNotEmpty()
@@ -33,8 +33,10 @@ export class CreateUserDto {
   @ApiProperty()
   is_agrred_to_terms_and_policy: boolean;
 
-  @IsNotEmpty({ message: 'FCM token is required' })
+  @IsOptional()
   @IsString()
-  @ApiProperty({ description: 'Firebase device token for push notifications' })
-  fcm_token: string;
+  @ApiPropertyOptional({
+    description: 'Firebase device token for push notifications',
+  })
+  fcm_token?: string;
 }

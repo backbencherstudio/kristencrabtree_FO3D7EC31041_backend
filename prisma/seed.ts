@@ -219,6 +219,55 @@ async function main() {
     console.log(`🚀 Plan created in DB: ${plan.title}`);
   }
 
+  // ── Access for subscription ────────────────────────────────────────────────
+  const accessPlans = [
+    {
+      id: 'access_free',
+      subscriptionName: 'free',
+      journal_entries: 2,
+      quotesPerday: 1,
+      digsPerWeek: 3,
+      murmurationLimit: false,
+      audioPostJournal: false,
+      meditationAccess: false,
+      adService: true,
+    },
+    {
+      id: 'access_monthly',
+      subscriptionName: 'monthly', // ← must match plan title lowercase
+      journal_entries: null, // null = unlimited
+      quotesPerday: null,
+      digsPerWeek: null,
+      murmurationLimit: true,
+      audioPostJournal: true,
+      meditationAccess: true,
+      adService: false,
+    },
+    {
+      id: 'access_yearly',
+      subscriptionName: 'yearly',
+      journal_entries: null,
+      quotesPerday: null,
+      digsPerWeek: null,
+      murmurationLimit: true,
+      audioPostJournal: true,
+      meditationAccess: true,
+      adService: false,
+    },
+  ];
+
+  for (const access of accessPlans) {
+    const existing = await prisma.accessForSubscription.findUnique({
+      where: { id: access.id },
+    });
+    if (existing) {
+      console.log(`✅ Access plan already exists: ${access.subscriptionName}`);
+    } else {
+      await prisma.accessForSubscription.create({ data: access });
+      console.log(`🚀 Access plan created: ${access.subscriptionName}`);
+    }
+  }
+
   // ── Admin user ─────────────────────────────────────────────────────────────
   const hashedPassword = await bcrypt.hash('12345678', 10);
 

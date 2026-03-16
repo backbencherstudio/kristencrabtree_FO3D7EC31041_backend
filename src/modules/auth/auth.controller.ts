@@ -143,13 +143,6 @@ export class AuthController {
     @Body('fcm_token') fcmToken: string,
   ) {
     try {
-      if (!fcmToken) {
-        return res.status(400).json({
-          success: false,
-          message: 'fcm_token is required',
-        });
-      }
-
       const user_id = req.user.id;
       const user_email = req.user.email;
 
@@ -213,30 +206,8 @@ export class AuthController {
   }
 
   @Post('google')
-  async googleLogin(@Body() dto: GoogleLoginDto) {
-    const { user, token } = await this.authService.googleLogin(dto.token);
-    // Remove sensitive fields if any
-    const { password, ...safeUser } = user;
-    return {
-      message: 'Login success',
-      user: safeUser,
-      token,
-    };
-  }
-
-  // @Get('google')
-  // @UseGuards(AuthGuard('google'))
-  // async googleLogin(): Promise<any> {
-  //   return HttpStatus.OK;
-  // }
-
-  @Get('google/redirect')
-  @UseGuards(AuthGuard('google'))
-  async googleLoginRedirect(@Req() req: Request): Promise<any> {
-    return {
-      statusCode: HttpStatus.OK,
-      data: req.user,
-    };
+  async googleFirebaseLogin(@Body() dto: GoogleLoginDto) {
+    return this.authService.googleLogin(dto.token, dto.fcm_token);
   }
 
   //  @Get('apple')

@@ -52,7 +52,7 @@ export class DigsService {
         };
       }
 
-      console.log(createDigDto.type)
+      console.log(createDigDto.type);
 
       const createdDig = await this.prisma.digs.create({
         data: {

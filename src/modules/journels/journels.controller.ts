@@ -32,6 +32,7 @@ export class JournelsController {
     @Req() req: any,
   ) {
     const user_id = req.user?.userId;
+    console.log(req.file)
     return this.journelsService.create(user_id, createJournelDto, audio);
   }
   @UseGuards(JwtAuthGuard)

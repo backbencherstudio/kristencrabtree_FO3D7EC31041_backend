@@ -26,7 +26,7 @@ export class QuotesService {
         data: {
           ...createQuoteDto,
           user_id,
-          type: { set: createQuoteDto.type },
+          type: createQuoteDto.type ?? [],
         },
       });
       return {
@@ -250,107 +250,107 @@ export class QuotesService {
     }
   }
   async getRandomAdminQuote(userId: string) {
-  try {
-    const userPlan = await SubscriptionManager(this.prisma, userId);
-    
-    // For free users, check Redis cache first
-    if (userPlan.subscriptionName === 'free') {
-      const cachedRaw = await this.redis.get(`quote:daily:${userId}`);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        return {
-          success: true,
-          message: 'Random admin quote retrieved',
-          data: cached,
+    try {
+      const userPlan = await SubscriptionManager(this.prisma, userId);
+
+      // For free users, check Redis cache first
+      if (userPlan.subscriptionName === 'free') {
+        const cachedRaw = await this.redis.get(`quote:daily:${userId}`);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          return {
+            success: true,
+            message: 'Random admin quote retrieved',
+            data: cached,
+          };
+        }
+      }
+
+      // ✅ Build where clause based on whether user has focus areas
+      const whereClause: any = {
+        user: { type: 'admin' },
+      };
+
+      // Only filter by focus_area if user has preferences set
+      if (userPlan.focus_area && userPlan.focus_area.length > 0) {
+        whereClause.type = {
+          hasSome: userPlan.focus_area,
         };
       }
-    }
 
-    // ✅ Build where clause based on whether user has focus areas
-    const whereClause: any = {
-      user: { type: 'admin' },
-    };
+      // ✅ Get total count with same filter
+      const total = await this.prisma.quote.count({
+        where: whereClause,
+      });
 
-    // Only filter by focus_area if user has preferences set
-    if (userPlan.focus_area && userPlan.focus_area.length > 0) {
-      whereClause.type = {
-        hasSome: userPlan.focus_area,
+      if (total === 0) {
+        return {
+          success: true,
+          message: 'No admin quotes found matching your preferences',
+          data: null,
+        };
+      }
+
+      const randomIndex = Math.floor(Math.random() * total);
+
+      const quote = await this.prisma.quote.findFirst({
+        where: whereClause,
+        orderBy: { created_at: 'asc' },
+        skip: randomIndex,
+        take: 1,
+      });
+
+      // ✅ Check if quote exists before accessing properties
+      if (!quote) {
+        return {
+          success: false,
+          message: 'No quote found matching your preferences',
+        };
+      }
+
+      const favourite = await this.prisma.quoteReaction.findFirst({
+        where: {
+          userId: userId,
+          qouteId: quote.id,
+        },
+      });
+
+      const quoteWithMeta = {
+        ...quote,
+        isFavourite: !!favourite,
+        shareLink: this.generateShareLink(quote.id), // ✅ Add share link here
       };
-    }
 
-    // ✅ Get total count with same filter
-    const total = await this.prisma.quote.count({
-      where: whereClause,
-    });
+      // Cache the quote for free users until midnight
+      if (userPlan.subscriptionName === 'free') {
+        const now = new Date();
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0);
+        const secondsUntilMidnight = Math.floor(
+          (midnight.getTime() - now.getTime()) / 1000,
+        );
 
-    if (total === 0) {
+        await this.redis.set(
+          `quote:daily:${userId}`,
+          JSON.stringify(quoteWithMeta),
+          'EX',
+          secondsUntilMidnight,
+        );
+      }
+
       return {
         success: true,
-        message: 'No admin quotes found matching your preferences',
-        data: null,
+        message: 'Random admin quote retrieved',
+        data: quoteWithMeta,
       };
-    }
-
-    const randomIndex = Math.floor(Math.random() * total);
-
-    const quote = await this.prisma.quote.findFirst({
-      where: whereClause,
-      orderBy: { created_at: 'asc' },
-      skip: randomIndex,
-      take: 1,
-    });
-
-    // ✅ Check if quote exists before accessing properties
-    if (!quote) {
+    } catch (error) {
       return {
         success: false,
-        message: 'No quote found matching your preferences',
+        message: 'Failed to fetch random quote',
+        error: error.message || error,
       };
     }
-
-    const favourite = await this.prisma.quoteReaction.findFirst({
-      where: {
-        userId: userId,
-        qouteId: quote.id,
-      },
-    });
-
-    const quoteWithMeta = {
-      ...quote,
-      isFavourite: !!favourite,
-      shareLink: this.generateShareLink(quote.id), // ✅ Add share link here
-    };
-
-    // Cache the quote for free users until midnight
-    if (userPlan.subscriptionName === 'free') {
-      const now = new Date();
-      const midnight = new Date();
-      midnight.setHours(24, 0, 0, 0);
-      const secondsUntilMidnight = Math.floor(
-        (midnight.getTime() - now.getTime()) / 1000,
-      );
-
-      await this.redis.set(
-        `quote:daily:${userId}`,
-        JSON.stringify(quoteWithMeta),
-        'EX',
-        secondsUntilMidnight,
-      );
-    }
-
-    return {
-      success: true,
-      message: 'Random admin quote retrieved',
-      data: quoteWithMeta,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Failed to fetch random quote',
-      error: error.message || error,
-    };
   }
-}
   async getQuoteForShare(quoteId: string) {
     const quote = await this.prisma.quote.findUnique({
       where: { id: quoteId },
@@ -379,7 +379,7 @@ export class QuotesService {
   generateSharePage(quote: any): string {
     const deepLink = `yourapp://quote/${quote.id}`;
     const webUrl = `${process.env.APP_URL}/quotes/share/${quote.id}`;
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">

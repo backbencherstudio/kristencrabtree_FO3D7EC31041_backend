@@ -1,19 +1,31 @@
-import { Controller, Get, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Param, Delete, UseGuards, Req, Patch, Body } from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Role } from '../../../common/guard/role/role.enum';
-import { Roles } from '../../../common/guard/role/roles.decorator';
-import { RolesGuard } from '../../../common/guard/role/roles.guard';
-import { JwtAuthGuard } from '../../../modules/auth/guards/jwt-auth.guard';
 import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UpdateNotificationSettingsDto } from './dto/notification-setting.dto';
 
 @ApiBearerAuth()
 @ApiTags('Notification')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
-@Controller('admin/notification')
+@UseGuards(JwtAuthGuard)
+@Controller('notification')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('settings')
+  async getSettings(@Req() req: any) {
+    return this.notificationService.getSettings(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('settings')
+  async updateSettings(
+    @Req() req: any,
+    @Body() dto: UpdateNotificationSettingsDto,
+  ) {
+    return this.notificationService.updateSettings(req.user.userId, dto);
+  }
 
   @ApiOperation({ summary: 'Get all notifications' })
   @Get()
@@ -39,7 +51,6 @@ export class NotificationController {
       const user_id = req.user.userId;
       const notification = await this.notificationService.remove(id, user_id);
       return notification;
-      
     } catch (error) {
       return {
         success: false,

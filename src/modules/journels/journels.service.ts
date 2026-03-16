@@ -111,19 +111,26 @@ export class JournelsService {
     if (user.fcm_token) {
       try {
         const isAudio = createJournelDto.type === 'Audio';
-        await this.firebaseService.sendToOne(user.fcm_token, {
-          title: 'Journal saved!',
-          body: isAudio
-            ? 'Your audio journal has been saved successfully.'
-            : `Your journal "${createJournelDto.title ?? 'entry'}" has been saved.`,
-          data: {
-            screen: 'JournalScreen',
-            journalId: newJournel.id,
-            type: createJournelDto.type,
+        await this.firebaseService.sendToOne(
+          user.fcm_token,
+          {
+            title: 'Journal saved!',
+            body: isAudio
+              ? 'Your audio journal has been saved successfully.'
+              : `Your journal "${createJournelDto.title ?? 'entry'}" has been saved.`,
+            data: {
+              screen: 'JournalScreen',
+              journalId: newJournel.id,
+              type: createJournelDto.type,
+            },
           },
-        });
+          {
+            receiverId: user_id,
+            type: 'journal_created',
+            entityId: newJournel.id,
+          },
+        );
       } catch (err) {
-        // Never fail journal creation because of notification error
         console.warn(
           `Push notification failed for user ${user_id}: ${err.message}`,
         );

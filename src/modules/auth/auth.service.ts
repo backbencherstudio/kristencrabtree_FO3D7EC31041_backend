@@ -1309,29 +1309,83 @@ export class AuthService {
   }
   // --------- end 2FA ---------
 
-  async googleLogin(idToken: string) {
+  async googleLogin(idToken: string, fcmToken?: string) {
     try {
+      // 1. Verify Firebase ID token
       const decoded = await this.firebaseAuth.verifyIdToken(idToken);
-      const { email, name, uid } = decoded;
+      const { email, name, uid, picture } = decoded;
 
       if (!email) throw new UnauthorizedException('No email in token');
 
+      // 2. Find or create user
       let user = await this.prisma.user.findUnique({ where: { email } });
+
       if (!user) {
+        // New user — create account
         user = await this.prisma.user.create({
           data: {
             email,
             name: name || '',
             firebaseUid: uid,
-            // maybe set other default fields
+            avatar: picture || null,
+            type: 'user',
+            fcm_token: fcmToken || null,
+          },
+        });
+
+        // Create user preferences
+        await this.prisma.userPreferences.create({
+          data: { user: { connect: { id: user.id } } },
+        });
+
+        // Create Stripe customer
+        const stripeCustomer = await StripePayment.createCustomer({
+          user_id: user.id,
+          email,
+          name: name || email,
+        });
+        if (stripeCustomer) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { billing_id: stripeCustomer.id },
+          });
+        }
+      } else {
+        // Existing user — update firebaseUid + fcm_token
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            firebaseUid: uid,
+            fcm_token: fcmToken || user.fcm_token,
           },
         });
       }
 
+      // 3. Generate JWT
       const payload = { sub: user.id, email: user.email };
-      const token = this.jwtService.sign(payload);
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-      return { user, token };
+      // 4. Store refresh token in Redis
+      await this.redis.set(
+        `refresh_token:${user.id}`,
+        refreshToken,
+        'EX',
+        60 * 60 * 24 * 7,
+      );
+
+      // 5. Return — no password field on Google users
+      const { password, ...safeUser } = user as any;
+      return {
+        success: true,
+        message: 'Login successful',
+        user: safeUser,
+        authorization: {
+          type: 'bearer',
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        },
+      };
     } catch (err) {
       throw new UnauthorizedException('Invalid Firebase token');
     }

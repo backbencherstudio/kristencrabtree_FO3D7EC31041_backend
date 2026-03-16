@@ -105,6 +105,7 @@ model User {
   userSubscription     UserSubscription[]
   weeklyDigs           UserWeeklyDig[]
   dailyDigs            UserDailyDig[]
+  notificationSettings NotificationSettings?
 
   @@map("users")
 }
@@ -330,6 +331,23 @@ model Notification {
   entity_id String?
 
   @@map("notifications")
+}
+
+model NotificationSettings {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user_id String @unique
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  meditation_reminders  Boolean @default(true)
+  new_content_alerts    Boolean @default(true)
+  community_updates     Boolean @default(true)
+  notification_reminder Boolean @default(true)
+  email_updates         Boolean @default(true)
+
+  @@map("notification_settings")
 }
 
 model UserPaymentMethod {

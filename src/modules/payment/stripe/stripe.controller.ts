@@ -52,11 +52,15 @@ export class StripeController {
           break;
 
         case 'customer.subscription.created':
-          await this.handleSubscriptionCreated(event.data.object as Stripe.Subscription);
+          await this.handleSubscriptionCreated(
+            event.data.object as Stripe.Subscription,
+          );
           break;
 
         case 'customer.subscription.updated':
-          await this.handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+          await this.handleSubscriptionUpdated(
+            event.data.object as Stripe.Subscription,
+          );
           break;
 
         case 'payment_intent.payment_failed':
@@ -114,14 +118,14 @@ export class StripeController {
   private async handleInvoicePaymentSucceeded(invoice: any) {
     try {
       // Update user subscription valid until date
-      const user= await this.prisma.user.update({
+      const user = await this.prisma.user.update({
         where: { email: invoice.customer_email },
         data: {
           subscriptionValidUntil: invoice.period_end.toString(),
         },
-        select:{
+        select: {
           id: true,
-        }
+        },
       });
 
       // await this.prisma.userSubscription.update({
@@ -149,8 +153,6 @@ export class StripeController {
           });
         }
       }
-    
-      
     } catch (error) {
       console.error('Error handling invoice payment succeeded:', error);
       throw error;
@@ -165,7 +167,7 @@ export class StripeController {
     try {
       const item = subscription.items.data[0];
       const price = item.price;
-      
+
       // Fetch full product details
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
       const product = await stripe.products.retrieve(price.product as string);
@@ -173,9 +175,12 @@ export class StripeController {
       const planId = price.id;
 
       // Get customer to find userId
-      const customer = await stripe.customers.retrieve(subscription.customer as string);
-      const userId = (customer as Stripe.Customer).metadata?.userId || 
-                     await this.getUserIdByBillingId(subscription.customer as string);
+      const customer = await stripe.customers.retrieve(
+        subscription.customer as string,
+      );
+      const userId =
+        (customer as Stripe.Customer).metadata?.userId ||
+        (await this.getUserIdByBillingId(subscription.customer as string));
 
       if (!userId) {
         console.error('Cannot find userId for subscription:', subscription.id);
@@ -184,22 +189,23 @@ export class StripeController {
 
       // Get payment method details
       const paymentMethod = subscription.default_payment_method
-        ? await stripe.paymentMethods.retrieve(subscription.default_payment_method as string)
+        ? await stripe.paymentMethods.retrieve(
+            subscription.default_payment_method as string,
+          )
         : null;
 
       // Find access plan
       const accessPlan = await this.prisma.accessForSubscription.findFirst({
-        where: {
-          subscriptionName: planName.toLowerCase(),
-        },
-        select: {
-          id: true,
-        },
+        where: { subscriptionName: planName.toLowerCase() },
+        select: { id: true },
       });
 
       if (!accessPlan) {
-        console.error(`No access plan found for subscription name: ${planName.toLowerCase()}`);
-        return;
+        console.error(
+          `No access plan found for subscription name: ${planName.toLowerCase()}`,
+        );
+        // Still create subscription even without access plan
+        // so user doesn't lose their payment record
       }
 
       // Create subscription and transaction in a transaction
@@ -211,25 +217,25 @@ export class StripeController {
             planName,
             planId,
             stripeSubscriptionId: subscription.id,
-            description: ['Stripe subscription'],
-            allowedPermissions: ['premium'],
             status: subscription.status,
             cardLast4: paymentMethod?.card?.last4 || null,
             method: 'stripe',
-            accessId: accessPlan.id,
+            description: ['Stripe subscription'],
+            allowedPermissions: ['premium'],
+            accessId: accessPlan?.id ?? null,
           },
           create: {
             userId,
             planName,
-            stripeSubscriptionId: subscription.id,
             planId,
+            stripeSubscriptionId: subscription.id,
             status: subscription.status,
             cardLast4: paymentMethod?.card?.last4 || null,
             method: 'stripe',
             description: ['Stripe subscription'],
             allowedPermissions: ['premium'],
             timesRenewed: 0,
-            accessId: accessPlan.id,
+            accessId: accessPlan?.id ?? null,
           },
         });
 
@@ -303,7 +309,10 @@ export class StripeController {
       });
 
       // If subscription is canceled or unpaid, you might want to revoke access
-      if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+      if (
+        subscription.status === 'canceled' ||
+        subscription.status === 'unpaid'
+      ) {
         await this.prisma.user.update({
           where: { id: sub.userId },
           data: {
@@ -320,7 +329,9 @@ export class StripeController {
   /**
    * Helper method to get userId from billing_id
    */
-  private async getUserIdByBillingId(billingId: string): Promise<string | null> {
+  private async getUserIdByBillingId(
+    billingId: string,
+  ): Promise<string | null> {
     const user = await this.prisma.user.findFirst({
       where: { billing_id: billingId },
       select: { id: true },

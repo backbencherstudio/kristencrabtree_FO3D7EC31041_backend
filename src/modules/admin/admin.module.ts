@@ -4,13 +4,13 @@ import { ContactModule } from './contact/contact.module';
 import { WebsiteInfoModule } from './website-info/website-info.module';
 import { PaymentTransactionModule } from './payment-transaction/payment-transaction.module';
 import { UserModule } from './user/user.module';
-import { NotificationModule } from './notification/notification.module';
 import { PlansModule } from './plans/plans.module';
 import { UserPageModule } from './user_page/user_page.module';
 import { ContentManagementModule } from './content_management/content_management.module';
 import { DigsModule } from './digs/digs.module';
 // import { SubscriptionModule } from './subscription/subscription.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [

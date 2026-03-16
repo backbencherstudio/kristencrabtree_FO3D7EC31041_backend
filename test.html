@@ -96,7 +96,7 @@
 
       localStorage.setItem(
         'access_token',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZ21haWwuY29tIiwic3ViIjoiY21tZDQyYnN5MDAwMXU4N3d2bnlnOGxhMyIsImlhdCI6MTc3Mjg3NjE0MCwiZXhwIjoxNzcyODc5NzQwfQ.m9du-gLPrMNUAzWtSgONMLcetRZ4qV5N5WahGVuMeIw',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZ21haWwuY29tIiwic3ViIjoiY21tcTQ3dzB3MDAwMXU4eXdmdnlnZW43aiIsImlhdCI6MTc3MzYzNDYwNiwiZXhwIjoxNzczNjM4MjA2fQ.-_mi0Aa91AW5-6yUK_di2Ahwd8KICQHR7UkLLWQfZpk',
       );
 
       card.mount('#card-element');
@@ -113,14 +113,17 @@
           // 🟢 STEP 1 — First call (get SetupIntent)
           console.log('🟢 STEP 1: Calling checkout (no confirmed)');
 
-          const res1 = await fetch('http://localhost:3000/api/plans/checkout', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
+          const res1 = await fetch(
+            'https://tomorrow-tremendous-about-sugar.trycloudflare.com/api/plans/checkout',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ planId }),
             },
-            body: JSON.stringify({ planId }),
-          });
+          );
 
           console.log('🟢 STEP 1: Response status', res1.status);
 
