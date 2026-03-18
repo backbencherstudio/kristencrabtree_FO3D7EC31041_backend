@@ -210,32 +210,12 @@ export class AuthController {
     return this.authService.googleLogin(dto.token, dto.fcm_token);
   }
 
-  //  @Get('apple')
-  // @UseGuards(AppleAuthGuard)
-  // async appleAuth(@Req() req) {
-  //   return HttpStatus.OK;
-  // }
-
-  // @Get('apple/redirect')
-  // @UseGuards(AppleAuthGuard)
-  // async appleAuthRedirect(@Req() req, @Res() res: Response) {
-  //   const { user, loginResponse } = req.user;
-
-  //   return res.json({
-  //     message: 'Logged in successfully via Apple',
-  //     authorization: loginResponse.authorization,
-  //     user: {
-  //       email: user.email,
-  //       first_name: user.first_name,
-  //       last_name: user.last_name,
-  //       avatar: user.avatar,
-  //     },
-  //   });
-  // }
-
   @Post('apple')
-  async appleLogin(@Body('idToken') idToken: string) {
-    return this.authService.appleLogin(idToken);
+  async appleLogin(
+    @Body('idToken') idToken: string,
+    @Body('fcm_token') fcmToken?: string,
+  ) {
+    return this.authService.appleLogin(idToken, fcmToken);
   }
 
   // update user

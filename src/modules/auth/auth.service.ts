@@ -313,123 +313,91 @@ export class AuthService {
     }
   }
 
-  // async appleLogin({
-  //   email,
-  //   userId,
-  //   aud,
-  // }: {
-  //   email: string;
-  //   userId: string;
-  //   aud: string;
-  // }) {
-  //   try {
-  //     const payload = { email, sub: userId, aud };
-
-  //     const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
-  //     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
-
-  //     const user = await UserRepository.getUserDetails(userId);
-
-  //     // await this.redis.set(
-  //     //   refresh_token:${user.id},
-  //     //   refreshToken,
-  //     //   'EX',
-  //     //   60 * 60 * 24 * 7,
-  //     // );
-
-  //     // create stripe customer account id
-  //     try {
-  //       const stripeCustomer = await StripePayment.createCustomer({
-  //         user_id: user.id,
-  //         email: user.email,
-  //         name:`${user.first_name} ${user.last_name}`,
-  //       });
-
-  //       if (stripeCustomer) {
-  //         await this.prisma.user.update({
-  //           where: { id: user.id },
-  //           data: { billing_id: stripeCustomer.id },
-  //         });
-  //       }
-  //     } catch (error) {
-  //       return {
-  //         success: false,
-  //         message: 'User created but failed to create billing account',
-  //       };
-  //     }
-
-  //     return {
-  //       message: 'Logged in successfully',
-  //       authorization: {
-  //         type: 'bearer',
-  //         access_token: accessToken,
-  //         refresh_token: refreshToken,
-  //       },
-  //       type: user.type,
-  //     };
-  //   } catch (error) {
-  //     return { success: false, message: error.message };
-  //   }
-  // }
-
-  async appleLogin(idToken: string) {
+  async appleLogin(idToken: string, fcmToken?: string) {
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      // 1. Verify Firebase ID token
+      const decoded = await this.firebaseAuth.verifyIdToken(idToken);
+      const { email, name, uid, picture } = decoded;
 
-      const { uid, email, name } = decodedToken;
+      if (!email) throw new UnauthorizedException('No email in token');
 
-      if (!email) {
-        return {
-          success: false,
-          message: 'Apple did not provide email',
-        };
-      }
-
-      let user = await this.prisma.user.findUnique({
-        where: { email },
-      });
+      // 2. Find or create user
+      let user = await this.prisma.user.findUnique({ where: { email } });
 
       if (!user) {
+        // New user — create account
+        // Apple only sends name on FIRST login — store it immediately
+        const firstName = name?.split(' ')[0] || '';
+        const lastName = name?.split(' ').slice(1).join(' ') || '';
+
         user = await this.prisma.user.create({
           data: {
             email,
+            name: name || '',
+            first_name: firstName,
+            last_name: lastName,
             firebaseUid: uid,
-            first_name: name?.split(' ')[0] || '',
-            last_name: name?.split(' ')[1] || '',
+            avatar: picture || null,
             type: 'user',
+            fcm_token: fcmToken || null,
+          },
+        });
+
+        // Create user preferences
+        await this.prisma.userPreferences.create({
+          data: { user: { connect: { id: user.id } } },
+        });
+
+        // Create Stripe customer
+        const stripeCustomer = await StripePayment.createCustomer({
+          user_id: user.id,
+          email,
+          name: name || email,
+        });
+        if (stripeCustomer) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { billing_id: stripeCustomer.id },
+          });
+        }
+      } else {
+        // Existing user — update firebaseUid + fcm_token
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            firebaseUid: uid,
+            fcm_token: fcmToken || user.fcm_token,
           },
         });
       }
 
-      const payload = {
-        sub: user.id,
-        email: user.email,
-      };
+      // 3. Generate JWT
+      const payload = { sub: user.id, email: user.email };
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-      const accessToken = this.jwtService.sign(payload, {
-        expiresIn: '1h',
-      });
+      // 4. Store refresh token in Redis
+      await this.redis.set(
+        `refresh_token:${user.id}`,
+        refreshToken,
+        'EX',
+        60 * 60 * 24 * 7,
+      );
 
-      const refreshToken = this.jwtService.sign(payload, {
-        expiresIn: '7d',
-      });
-
+      // 5. Return — no password field on Apple users
+      const { password, ...safeUser } = user as any;
       return {
         success: true,
         message: 'Logged in successfully via Apple',
+        user: safeUser,
         authorization: {
           type: 'bearer',
           access_token: accessToken,
           refresh_token: refreshToken,
         },
-        user,
       };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Invalid Firebase token',
-        error: error.message,
-      };
+    } catch (err) {
+      throw new UnauthorizedException('Invalid Apple token');
     }
   }
 

@@ -1,249 +1,212 @@
 <!doctype html>
 <html>
   <head>
-    <title>Firebase Google Login Test</title>
+    <title>Firebase Auth Test</title>
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      body {
-        font-family: sans-serif;
-        max-width: 600px;
-        margin: 60px auto;
-        padding: 0 20px;
-        background: #f9f9f9;
-      }
-      h2 {
-        margin-bottom: 8px;
-      }
-      p {
-        color: #666;
-        margin-bottom: 20px;
-        font-size: 14px;
-      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; background: #f9f9f9; }
+      h2 { margin-bottom: 8px; }
+      p  { color: #666; margin-bottom: 24px; font-size: 14px; }
+      .btn-group { display: flex; flex-direction: column; gap: 12px; }
       button {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 12px 24px;
-        background: #fff;
-        color: #333;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 15px;
-        cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 24px; border-radius: 6px; font-size: 15px;
+        cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+        border: 1px solid #ddd; width: 100%; background: #fff; color: #333;
       }
-      button:hover {
-        background: #f1f1f1;
-      }
-      button svg {
-        width: 20px;
-        height: 20px;
-      }
-      pre {
-        background: #1e1e1e;
-        color: #d4d4d4;
-        padding: 16px;
-        border-radius: 6px;
-        overflow-x: auto;
-        font-size: 12px;
-        line-height: 1.6;
-        margin-top: 8px;
-      }
-      .card {
-        background: #fff;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 16px 20px;
-        margin-top: 20px;
-      }
-      .label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 4px;
-      }
-      .badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-        margin-bottom: 16px;
-      }
-      .success {
-        background: #e6f4ea;
-        color: #1e6823;
-      }
-      .error {
-        background: #fce8e6;
-        color: #c5221f;
-      }
-      .user-row {
-        display: flex;
-        justify-content: space-between;
-        font-size: 13px;
-        padding: 6px 0;
-        border-bottom: 1px solid #f0f0f0;
-      }
-      .user-row:last-child {
-        border: none;
-      }
-      .user-key {
-        color: #888;
-      }
-      .user-val {
-        color: #333;
-        font-weight: 500;
-      }
-      #status {
-        font-size: 13px;
-        color: #888;
-        margin-top: 12px;
-        display: none;
-      }
+      button:hover { background: #f1f1f1; }
+      button.apple-btn { background: #000; color: #fff; border-color: #000; }
+      button.apple-btn:hover { background: #222; }
+      button svg { width: 20px; height: 20px; flex-shrink: 0; }
+      pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 12px; line-height: 1.6; margin-top: 8px; }
+      .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin-top: 20px; }
+      .label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+      .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; margin-bottom: 16px; }
+      .success { background: #e6f4ea; color: #1e6823; }
+      .error   { background: #fce8e6; color: #c5221f; }
+      .warning { background: #faeeda; color: #633806; }
+      .user-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+      .user-row:last-child { border: none; }
+      .user-key { color: #888; }
+      .user-val { color: #333; font-weight: 500; word-break: break-all; max-width: 70%; text-align: right; }
+      #status { font-size: 13px; color: #888; margin-top: 12px; display: none; }
+      .note { font-size: 12px; color: #888; margin-top: 6px; padding: 8px 12px; background: #f0f0f0; border-radius: 4px; }
     </style>
   </head>
   <body>
-    <h2>Firebase Google Login Test</h2>
-    <p>
-      Signs in with Google via Firebase → sends ID token to your NestJS backend.
-    </p>
+    <h2>Firebase Auth Test</h2>
+    <p>Test Google and Apple login via Firebase → NestJS backend.</p>
 
-    <button onclick="loginWithGoogle()">
-      <svg viewBox="0 0 48 48">
-        <path
-          fill="#EA4335"
-          d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-        />
-        <path
-          fill="#4285F4"
-          d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-        />
-        <path
-          fill="#FBBC05"
-          d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-        />
-        <path
-          fill="#34A853"
-          d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-        />
-        <path fill="none" d="M0 0h48v48H0z" />
-      </svg>
-      Sign in with Google
-    </button>
+    <div class="btn-group">
+      <button onclick="loginWithGoogle()">
+        <svg viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          <path fill="none" d="M0 0h48v48H0z"/>
+        </svg>
+        Sign in with Google
+      </button>
+
+      <div>
+        <button class="apple-btn" onclick="loginWithApple()">
+          <svg viewBox="0 0 24 24" fill="white">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          </svg>
+          Sign in with Apple
+        </button>
+        <div class="note">⚠️ Apple Sign-In works in browser only on Safari. For full testing use iOS device.</div>
+      </div>
+    </div>
 
     <div id="status">Signing you in...</div>
     <div id="result"></div>
 
     <script type="module">
-      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+      import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
       import {
         getAuth,
         GoogleAuthProvider,
+        OAuthProvider,
         signInWithPopup,
       } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-      const BACKEND_URL = 'http://localhost:3000';
+      const BACKEND_URL = 'https://kristencrabtree.pixelstack.cloud';
 
       const firebaseConfig = {
-        apiKey: 'AIzaSyD1p7NyVUNNCvAC9WX3JE3VligsSIsmSIU',
-        authDomain: 'notification-b84ca.firebaseapp.com',
-        projectId: 'notification-b84ca',
-        storageBucket: 'notification-b84ca.firebasestorage.app',
+        apiKey:            'AIzaSyD1p7NyVUNNCvAC9WX3JE3VligsSIsmSIU',
+        authDomain:        'notification-b84ca.firebaseapp.com',
+        projectId:         'notification-b84ca',
+        storageBucket:     'notification-b84ca.firebasestorage.app',
         messagingSenderId: '27980473217',
-        appId: '1:27980473217:web:37721c5bdddc6ef5583e80',
+        appId:             '1:27980473217:web:37721c5bdddc6ef5583e80',
       };
 
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const provider = new GoogleAuthProvider();
+      const app           = initializeApp(firebaseConfig);
+      const auth          = getAuth(app);
+      const googleProvider = new GoogleAuthProvider();
+      const appleProvider  = new OAuthProvider('apple.com');
 
+      // Request name + email from Apple
+      appleProvider.addScope('email');
+      appleProvider.addScope('name');
+
+      // ── Shared: send token to backend ────────────────────────
+      async function sendToBackend(idToken, endpoint) {
+        const res  = await fetch(`${BACKEND_URL}/api/auth/${endpoint}`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(
+            endpoint === 'google'
+              ? { token: idToken }
+              : { idToken }
+          ),
+        });
+        return res.json();
+      }
+
+      // ── Show result ──────────────────────────────────────────
+      function showResult(data, provider) {
+        const resultEl = document.getElementById('result');
+
+        if (!data.success) {
+          resultEl.innerHTML = `
+            <div class="card">
+              <span class="badge error">${provider} Login Failed</span>
+              <div class="label">Error</div>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            </div>`;
+          return;
+        }
+
+        localStorage.setItem('access_token',  data.authorization.access_token);
+        localStorage.setItem('refresh_token', data.authorization.refresh_token);
+
+        const user = data.user;
+        const rows = ['id','email','name','first_name','last_name','type','subscriptionPlan']
+          .filter(k => user[k])
+          .map(k => `
+            <div class="user-row">
+              <span class="user-key">${k}</span>
+              <span class="user-val">${user[k]}</span>
+            </div>`).join('');
+
+        resultEl.innerHTML = `
+          <div class="card">
+            <span class="badge success">${provider} Login Successful</span>
+            <div class="label">Access Token</div>
+            <pre>${data.authorization.access_token}</pre>
+            <div class="label" style="margin-top:12px">Refresh Token</div>
+            <pre>${data.authorization.refresh_token}</pre>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="label" style="margin-bottom:10px">User Profile</div>
+            ${rows || '<pre>' + JSON.stringify(user, null, 2) + '</pre>'}
+          </div>`;
+      }
+
+      // ── Google Login ─────────────────────────────────────────
       window.loginWithGoogle = async () => {
         const statusEl = document.getElementById('status');
         const resultEl = document.getElementById('result');
         statusEl.style.display = 'block';
-        resultEl.innerHTML = '';
+        statusEl.textContent   = 'Opening Google sign-in...';
+        resultEl.innerHTML     = '';
 
         try {
-          // 1. Open Google popup
-          const result = await signInWithPopup(auth, provider);
-
-          // 2. Get Firebase ID token
+          const result  = await signInWithPopup(auth, googleProvider);
           const idToken = await result.user.getIdToken();
-          console.log('Firebase ID Token:', idToken);
 
-          statusEl.textContent = 'Sending token to backend...';
-
-          // 3. Send to your NestJS backend
-          const res = await fetch(`${BACKEND_URL}/api/auth/google`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: idToken }),
-          });
-
-          const data = await res.json();
+          statusEl.textContent = 'Sending to backend...';
+          const data = await sendToBackend(idToken, 'google');
           statusEl.style.display = 'none';
-
-          if (!data.success) {
-            resultEl.innerHTML = `
-          <div class="card">
-            <span class="badge error">Login Failed</span>
-            <div class="label">Error</div>
-            <pre>${JSON.stringify(data, null, 2)}</pre>
-          </div>`;
-            return;
-          }
-
-          // 4. Store tokens
-          localStorage.setItem('access_token', data.authorization.access_token);
-          localStorage.setItem(
-            'refresh_token',
-            data.authorization.refresh_token,
-          );
-
-          // 5. Show result
-          const user = data.user;
-          const rows = [
-            'id',
-            'email',
-            'name',
-            'first_name',
-            'last_name',
-            'type',
-            'subscriptionPlan',
-          ]
-            .filter((k) => user[k])
-            .map(
-              (k) =>
-                `<div class="user-row"><span class="user-key">${k}</span><span class="user-val">${user[k]}</span></div>`,
-            )
-            .join('');
-
-          resultEl.innerHTML = `
-        <div class="card">
-          <span class="badge success">Login Successful</span>
-          <div class="label">Access Token</div>
-          <pre>${data.authorization.access_token}</pre>
-          <div class="label" style="margin-top:12px">Refresh Token</div>
-          <pre>${data.authorization.refresh_token}</pre>
-        </div>
-        <div class="card" style="margin-top:12px">
-          <div class="label" style="margin-bottom:10px">User Profile</div>
-          ${rows}
-        </div>`;
+          showResult(data, 'Google');
         } catch (err) {
           statusEl.style.display = 'none';
           resultEl.innerHTML = `
-        <div class="card">
-          <span class="badge error">Error</span>
-          <pre>${err.message}</pre>
-        </div>`;
+            <div class="card">
+              <span class="badge error">Error</span>
+              <pre>${err.message}</pre>
+            </div>`;
+          console.error(err);
+        }
+      };
+
+      // ── Apple Login ──────────────────────────────────────────
+      window.loginWithApple = async () => {
+        const statusEl = document.getElementById('status');
+        const resultEl = document.getElementById('result');
+        statusEl.style.display = 'block';
+        statusEl.textContent   = 'Opening Apple sign-in...';
+        resultEl.innerHTML     = '';
+
+        try {
+          const result  = await signInWithPopup(auth, appleProvider);
+          const idToken = await result.user.getIdToken();
+
+          statusEl.textContent = 'Sending to backend...';
+          const data = await sendToBackend(idToken, 'apple');
+          statusEl.style.display = 'none';
+          showResult(data, 'Apple');
+        } catch (err) {
+          statusEl.style.display = 'none';
+
+          // Apple-specific error messages
+          let msg = err.message;
+          if (err.code === 'auth/popup-blocked') {
+            msg = 'Popup was blocked. Please allow popups for this page.';
+          } else if (err.code === 'auth/operation-not-allowed') {
+            msg = 'Apple Sign-In is not enabled in Firebase Console. Enable it under Authentication → Sign-in method.';
+          } else if (err.code === 'auth/unauthorized-domain') {
+            msg = 'This domain is not authorized in Firebase. Add it under Authentication → Settings → Authorized domains.';
+          }
+
+          resultEl.innerHTML = `
+            <div class="card">
+              <span class="badge error">Apple Login Error</span>
+              <pre>${msg}</pre>
+            </div>`;
           console.error(err);
         }
       };
