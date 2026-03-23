@@ -76,45 +76,81 @@ async function main() {
     {
       id: 'plan_free',
       title: 'Free',
-      subtitle: 'Get started for free',
-      description: 'Basic access to the platform',
+      subtitle: 'Perfect for getting started',
+      description: 'Start the dig—no pressure, just curiosity.',
       price: '0.00',
       price_in_cents: 0,
       tag: 'free',
-      interval: null, // no Stripe product for free plan
-      features: ['2 journal entries', '1 quote per day', '3 digs per week'],
+      interval: null,
+      features: [
+        'Limited journaling entries',
+        'Daily quotes and inspiration',
+        'Three question/exercise per week',
+        'Read-only community access',
+        'Basic progress tracking',
+        'Ad-supported experience',
+      ],
     },
     {
       id: 'plan_monthly',
       title: 'Monthly',
-      subtitle: 'Billed every month',
-      description: 'Full access, billed monthly',
-      price: '9.99',
-      price_in_cents: 999,
+      subtitle: 'For those ready to go deeper',
+      description: 'For seekers who want presence to become a practice.',
+      price: '8.88',
+      price_in_cents: 888,
       tag: 'popular',
       interval: 'month' as const,
       features: [
-        'Unlimited journal entries',
-        'Audio journal posts',
-        'Meditation access',
+        'Unlimited text & audio journaling',
+        'Unlimited scheduled exercises & questions',
+        'Full community participation (post & reply)',
+        'Join Murmuration & collaborative experiences',
+        'Access to live group sessions & one-on-one coaching',
+        'Contribute personal inspirational messages',
+        'Who Am I & Mind Expansion experiences',
+        'Exclusive curated meditations',
         'Ad-free experience',
+        'Advanced progress analytics & export',
       ],
     },
     {
-      id: 'plan_yearly',
-      title: 'Yearly',
-      subtitle: 'Billed annually — save 20%',
-      description: 'Full access, billed yearly',
-      price: '95.88',
-      price_in_cents: 9588,
-      tag: 'best_value',
+      id: 'plan_annual',
+      title: 'Annual',
+      subtitle: 'For those ready to go deeper',
+      description: "For those who've decided: no more half-hearted living.",
+      price: '53.28',
+      price_in_cents: 5328,
+      tag: '50_off',
       interval: 'year' as const,
       features: [
-        'Unlimited journal entries',
-        'Audio journal posts',
-        'Meditation access',
+        'Unlimited text & audio journaling',
+        'Unlimited scheduled exercises & questions',
+        'Full community participation (post & reply)',
+        'Join Murmuration & collaborative experiences',
+        'Access to live group sessions & one-on-one coaching',
+        'Contribute personal inspirational messages',
+        'Who Am I & Mind Expansion experiences',
+        'Exclusive curated meditations',
         'Ad-free experience',
-        '2 months free',
+        'Advanced progress analytics & export',
+      ],
+    },
+    {
+      id: 'plan_lifetime',
+      title: 'Lifetime',
+      subtitle: 'The Lifetime Access',
+      description: 'For those who are all in.',
+      price: '222.22',
+      price_in_cents: 22222,
+      tag: 'special',
+      interval: null as null, // one-time payment — no recurring interval
+      features: [
+        'Everything in Premium, forever',
+        'All future premium content & features',
+        'Exclusive "The Dig Never Ends" special-edition tee',
+        'One-time 45-minute private Excavation Session with Kristen',
+        'Priority support & early access to new features',
+        'Lifetime community member status',
       ],
     },
   ];
@@ -130,8 +166,10 @@ async function main() {
     let stripe_product_id: string | null = null;
     let stripe_price_id: string | null = null;
 
-    // ── Only create Stripe product for paid plans ──────────────────────────
-    if (plan.interval !== null) {
+    // ── Create Stripe product for all paid plans ───────────────────────────
+    // Both recurring (monthly/annual) and one-time (lifetime) need a Stripe
+    // product + price so checkout sessions can be created for them.
+    if (plan.price_in_cents > 0) {
       try {
         // 1. Check if a Stripe product with this name already exists
         const existingProducts = await stripe.products.search({
@@ -141,13 +179,11 @@ async function main() {
         let product: Stripe.Product;
 
         if (existingProducts.data.length > 0) {
-          // Reuse existing product to avoid duplicates on re-runs
           product = existingProducts.data[0];
           console.log(
             `♻️  Reusing Stripe product: ${product.id} (${plan.title})`,
           );
         } else {
-          // Create new Stripe product
           product = await stripe.products.create({
             name: plan.title,
             description: plan.description,
@@ -160,33 +196,38 @@ async function main() {
 
         stripe_product_id = product.id;
 
-        // 2. Check if a price already exists for this product + interval
+        // 2. Check if a matching price already exists for this product
         const existingPrices = await stripe.prices.list({
           product: product.id,
           active: true,
         });
 
-        const matchingPrice = existingPrices.data.find(
-          (p) =>
-            p.unit_amount === plan.price_in_cents &&
-            p.recurring?.interval === plan.interval,
-        );
+        // For recurring plans match on amount + interval.
+        // For lifetime (one-time) match on amount + no recurring field.
+        const matchingPrice = existingPrices.data.find((p) => {
+          if (p.unit_amount !== plan.price_in_cents) return false;
+          if (plan.interval) {
+            return p.recurring?.interval === plan.interval;
+          }
+          return p.recurring === null; // one-time price
+        });
 
         let stripePrice: Stripe.Price;
 
         if (matchingPrice) {
-          // Reuse existing price
           stripePrice = matchingPrice;
           console.log(
             `♻️  Reusing Stripe price: ${stripePrice.id} (${plan.title})`,
           );
         } else {
-          // Create new Stripe price
           stripePrice = await stripe.prices.create({
             product: product.id,
             unit_amount: plan.price_in_cents,
             currency: 'usd',
-            recurring: { interval: plan.interval },
+            // Recurring plans get a recurring object; lifetime gets none
+            ...(plan.interval
+              ? { recurring: { interval: plan.interval } }
+              : {}),
             metadata: { plan_id: plan.id },
           });
           console.log(
@@ -197,11 +238,11 @@ async function main() {
         stripe_price_id = stripePrice.id;
       } catch (err) {
         console.error(`❌ Stripe error for plan "${plan.title}":`, err);
-        throw err; // stop seed if Stripe fails — keeps DB and Stripe in sync
+        throw err;
       }
     }
 
-    // 3. Save plan to DB with real Stripe IDs
+    // 3. Save plan to DB
     await prisma.plans.create({
       data: {
         id: plan.id,
