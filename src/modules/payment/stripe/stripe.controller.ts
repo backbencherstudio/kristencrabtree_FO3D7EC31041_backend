@@ -26,7 +26,6 @@ export class StripeController {
 
       console.log(event.type);
 
-      // Handle events
       switch (event.type) {
         case 'customer.created':
           break;
@@ -36,8 +35,6 @@ export class StripeController {
 
         case 'payment_intent.succeeded':
           const paymentIntent = event.data.object;
-
-          // Update transaction status in database
           await TransactionRepository.updateTransaction({
             reference_number: paymentIntent.id,
             status: 'succeeded',
@@ -111,35 +108,28 @@ export class StripeController {
     }
   }
 
-  /**
-   * Handles invoice payment succeeded event
-   * This runs on every invoice payment (including renewals)
-   */
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INVOICE PAYMENT SUCCEEDED
+  // Fires on every successful invoice — including first payment and renewals.
+  // ═══════════════════════════════════════════════════════════════════════════
+
   private async handleInvoicePaymentSucceeded(invoice: any) {
     try {
-      // Update user subscription valid until date
-      const user = await this.prisma.user.update({
+      // period_end is a Unix timestamp — convert to ISO string
+      const validUntil = new Date(invoice.period_end * 1000).toISOString();
+
+      // Always keep subscriptionValidUntil current
+      await this.prisma.user.update({
         where: { email: invoice.customer_email },
-        data: {
-          subscriptionValidUntil: invoice.period_end.toString(),
-        },
-        select: {
-          id: true,
-        },
+        data: { subscriptionValidUntil: validUntil },
       });
 
-      // await this.prisma.userSubscription.update({
-      //   where:{ userId: user.id },
-      //   data:{
-      //   }
-      // })
-
-      // Ignore the first invoice (subscription creation) - handle in subscription.created instead
+      // First-time payment is fully handled in handleSubscriptionCreated
       if (invoice.billing_reason === 'subscription_creation') {
         return;
       }
 
-      // Handle renewals
+      // Renewal — increment counter
       if (invoice.billing_reason === 'subscription_cycle') {
         const subscriptionId = invoice.subscription as string;
         const sub = await this.prisma.userSubscription.findFirst({
@@ -159,22 +149,23 @@ export class StripeController {
     }
   }
 
-  /**
-   * Handles subscription created event
-   * This is where we create the initial subscription record
-   */
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUBSCRIPTION CREATED
+  // Creates the initial subscription record and updates the user plan fields.
+  // ═══════════════════════════════════════════════════════════════════════════
+
   private async handleSubscriptionCreated(subscription: Stripe.Subscription) {
     try {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
       const item = subscription.items.data[0];
       const price = item.price;
 
-      // Fetch full product details
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+      // Fetch product to get human-readable plan name
       const product = await stripe.products.retrieve(price.product as string);
-      const planName = product.name;
-      const planId = price.id;
+      const planName = product.name; // e.g. "Monthly", "Annual", "Lifetime"
 
-      // Get customer to find userId
+      // ── Resolve userId ──────────────────────────────────────────────────
       const customer = await stripe.customers.retrieve(
         subscription.customer as string,
       );
@@ -187,38 +178,55 @@ export class StripeController {
         return;
       }
 
-      // Get payment method details
+      // ── Look up our DB plan row by Stripe price id ──────────────────────
+      // Gives us the canonical plan_id (e.g. plan_monthly) instead of price_xxx
+      const planRow = await this.prisma.plans.findFirst({
+        where: { stripe_price_id: price.id },
+      });
+
+      if (!planRow) {
+        console.warn(
+          `No plans row found for stripe_price_id: ${price.id} — subscription still recorded`,
+        );
+      }
+
+      // ── Subscription valid until ────────────────────────────────────────
+      // current_period_end lives on the subscription item in newer Stripe SDK
+      // versions. Cast to any as a safe fallback so both SDK shapes are handled.
+      const periodEnd: number =
+        (subscription as any).current_period_end ?? item.current_period_end;
+      const validUntil = new Date(periodEnd * 1000).toISOString();
+
+      // ── Payment method ──────────────────────────────────────────────────
       const paymentMethod = subscription.default_payment_method
         ? await stripe.paymentMethods.retrieve(
             subscription.default_payment_method as string,
           )
         : null;
 
-      // Find access plan
+      // ── Access plan ─────────────────────────────────────────────────────
       const accessPlan = await this.prisma.accessForSubscription.findFirst({
         where: { subscriptionName: planName.toLowerCase() },
         select: { id: true },
       });
 
       if (!accessPlan) {
-        console.error(
+        console.warn(
           `No access plan found for subscription name: ${planName.toLowerCase()}`,
         );
-        // Still create subscription even without access plan
-        // so user doesn't lose their payment record
       }
 
-      // Create subscription and transaction in a transaction
+      // ── Persist everything atomically ───────────────────────────────────
       await this.prisma.$transaction(async (tx) => {
-        // Upsert user subscription
+        // 1. Upsert UserSubscription
         await tx.userSubscription.upsert({
           where: { userId },
           update: {
             planName,
-            planId,
+            planId: planRow?.id ?? price.id,
             stripeSubscriptionId: subscription.id,
             status: subscription.status,
-            cardLast4: paymentMethod?.card?.last4 || null,
+            cardLast4: paymentMethod?.card?.last4 ?? null,
             method: 'stripe',
             description: ['Stripe subscription'],
             allowedPermissions: ['premium'],
@@ -227,10 +235,10 @@ export class StripeController {
           create: {
             userId,
             planName,
-            planId,
+            planId: planRow?.id ?? price.id,
             stripeSubscriptionId: subscription.id,
             status: subscription.status,
-            cardLast4: paymentMethod?.card?.last4 || null,
+            cardLast4: paymentMethod?.card?.last4 ?? null,
             method: 'stripe',
             description: ['Stripe subscription'],
             allowedPermissions: ['premium'],
@@ -239,9 +247,7 @@ export class StripeController {
           },
         });
 
-        // console.log(accessPlan);
-
-        // Create payment transaction
+        // 2. Create payment transaction record
         await tx.paymentTransaction.create({
           data: {
             type: 'subscription',
@@ -252,22 +258,28 @@ export class StripeController {
               ? new Prisma.Decimal(price.unit_amount / 100)
               : null,
             currency: price.currency,
-            order_id: `${userId}-${planId}`,
+            order_id: `${userId}-${price.id}`,
             user: { connect: { id: userId } },
             subscription: { connect: { userId } },
           },
         });
 
-        // Update user subscription plan
+        console.log(planName);
+
+        // 3. Update User — both plan name AND valid-until in one write
+        //    This is what was missing: subscriptionPlan stayed "free" because
+        //    it was never set here, and subscriptionValidUntil was skipped for
+        //    subscription_creation billing reason in the invoice handler.
         await tx.user.update({
           where: { id: userId },
           data: {
             subscriptionPlan: planName,
+            subscriptionValidUntil: validUntil,
           },
         });
       });
 
-      // Send notifications to admins
+      // ── Notify admins ───────────────────────────────────────────────────
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       const admins = await this.prisma.user.findMany({
         where: { type: 'admin' },
@@ -285,10 +297,11 @@ export class StripeController {
     }
   }
 
-  /**
-   * Handles subscription updated event
-   * This handles status changes (active, canceled, past_due, etc.)
-   */
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUBSCRIPTION UPDATED
+  // Handles status changes: active → canceled, past_due, unpaid, etc.
+  // ═══════════════════════════════════════════════════════════════════════════
+
   private async handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     try {
       const sub = await this.prisma.userSubscription.findFirst({
@@ -300,24 +313,19 @@ export class StripeController {
         return;
       }
 
-      // Update subscription status
       await this.prisma.userSubscription.update({
         where: { id: sub.id },
-        data: {
-          status: subscription.status,
-        },
+        data: { status: subscription.status },
       });
 
-      // If subscription is canceled or unpaid, you might want to revoke access
+      // Revoke premium access when subscription lapses
       if (
         subscription.status === 'canceled' ||
         subscription.status === 'unpaid'
       ) {
         await this.prisma.user.update({
           where: { id: sub.userId },
-          data: {
-            subscriptionPlan: 'free',
-          },
+          data: { subscriptionPlan: 'free' },
         });
       }
     } catch (error) {
@@ -326,9 +334,10 @@ export class StripeController {
     }
   }
 
-  /**
-   * Helper method to get userId from billing_id
-   */
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════════════════════════════════════════
+
   private async getUserIdByBillingId(
     billingId: string,
   ): Promise<string | null> {
@@ -336,6 +345,6 @@ export class StripeController {
       where: { billing_id: billingId },
       select: { id: true },
     });
-    return user?.id || null;
+    return user?.id ?? null;
   }
 }

@@ -88,6 +88,7 @@
     </div>
 
     <script>
+      const URL = 'https://environmental-hills-actors-recognition.trycloudflare.com';
       const stripe = Stripe(
         'pk_test_51T7W1fBtR4J7s8D832BkoNqhevOot16l3J9mvLM46ZSDd1C0IXfCnNPltqWHzI1c592WPZ9XO6MdQnS4Cv2GnI8500CwxqGX87',
       );
@@ -96,7 +97,7 @@
 
       localStorage.setItem(
         'access_token',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZ21haWwuY29tIiwic3ViIjoiY21tcTQ3dzB3MDAwMXU4eXdmdnlnZW43aiIsImlhdCI6MTc3MzYzNDYwNiwiZXhwIjoxNzczNjM4MjA2fQ.-_mi0Aa91AW5-6yUK_di2Ahwd8KICQHR7UkLLWQfZpk',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZ21haWwuY29tIiwic3ViIjoiY21uMzEyNzJjMDAwMXU4bndldjhqODNweiIsImlhdCI6MTc3NDI2MDg3MCwiZXhwIjoxNzc0MjY0NDcwfQ.Bxa8tiEixiUNK7ULyW9UfDdn1Uz2WCPiJlJ38VB98YE',
       );
 
       card.mount('#card-element');
@@ -113,17 +114,14 @@
           // 🟢 STEP 1 — First call (get SetupIntent)
           console.log('🟢 STEP 1: Calling checkout (no confirmed)');
 
-          const res1 = await fetch(
-            'https://tomorrow-tremendous-about-sugar.trycloudflare.com/api/plans/checkout',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ planId }),
+          const res1 = await fetch(`${URL}/api/plans/checkout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
             },
-          );
+            body: JSON.stringify({ planId }),
+          });
 
           console.log('🟢 STEP 1: Response status', res1.status);
 
@@ -161,7 +159,7 @@
           // 🟢 STEP 3 — Second call (create subscription)
           //   console.log('🟢 STEP 3: Calling checkout with confirmed=true');
 
-          const res2 = await fetch('http://localhost:3000/api/plans/checkout', {
+          const res2 = await fetch(`${URL}/api/plans/checkout`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
