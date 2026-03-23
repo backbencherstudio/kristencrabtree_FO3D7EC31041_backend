@@ -15,6 +15,7 @@ export class CreateQuoteDto {
   @IsString()
   quote_text?: string;
 
+  @IsOptional()
   @IsString()
   reason?: string;
 }
