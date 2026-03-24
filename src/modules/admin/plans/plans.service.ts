@@ -72,19 +72,38 @@ export class PlansService {
       expand: ['data.product'],
     });
 
-    // return prices;
+    const dbPlans = await this.prisma.plans.findMany({
+      where: { deleted_at: null },
+    });
+
+    const planMap = new Map(
+      dbPlans.map((plan) => [plan.stripe_price_id, plan]),
+    );
+
     return {
       success: true,
-      data: prices.data.map((price) => ({
-        id: price.id,
-        name: (price.product as any).name,
-        description: (price.product as any).description,
-        // type:(price.recurring.interval),
-        amount: price.unit_amount,
-        currency: price.currency,
-        interval: price?.recurring?.interval || 'Not available',
-        status: price.active,
-      })),
+      data: prices.data.map((price) => {
+        const dbPlan = planMap.get(price.id);
+
+        return {
+          id: dbPlan?.id || null, // ✅ DB ID added here
+          stripe_price_id: price.id,
+
+          name: (price.product as any).name,
+          description: (price.product as any).description,
+
+          amount: price.unit_amount,
+          currency: price.currency,
+          interval: price?.recurring?.interval || 'Not available',
+          status: price.active,
+
+          // optional DB fields (bonus)
+          title: dbPlan?.title,
+          subtitle: dbPlan?.subtitle,
+          tag: dbPlan?.tag,
+          features: dbPlan?.features || [],
+        };
+      }),
     };
   }
 

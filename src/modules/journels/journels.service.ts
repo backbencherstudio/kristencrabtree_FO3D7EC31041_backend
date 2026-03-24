@@ -229,7 +229,13 @@ export class JournelsService {
       where: { user_id: { not: userId } },
       include: {
         user: {
-          select: { id: true, first_name: true, last_name: true, avatar: true },
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            name: true,
+            avatar: true,
+          },
         },
       },
       orderBy: { created_at: 'desc' },
