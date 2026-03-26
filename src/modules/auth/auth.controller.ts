@@ -70,38 +70,6 @@ export class AuthController {
         );
       }
 
-      // if (!name) {
-      //   throw new HttpException('Name not provided', HttpStatus.UNAUTHORIZED);
-      // }
-      if (!first_name) {
-        throw new HttpException(
-          'First name not provided',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-      if (!last_name) {
-        throw new HttpException(
-          'Last name not provided',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-      if (!email) {
-        throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
-      }
-      if (!password) {
-        throw new HttpException(
-          'Password not provided',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-
-      if (!fcm_token) {
-        throw new HttpException(
-          'FCM token is required',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
       const response = await this.authService.register({
         name: first_name + ' ' + last_name,
         first_name: first_name,
