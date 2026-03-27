@@ -31,10 +31,12 @@ const NOTIFICATION_TYPE_MAP: Record<string, NotificationSettingKey> = {
   weekly_digs: 'new_content_alerts',
   new_quote: 'new_content_alerts',
   new_meditation: 'new_content_alerts',
+  new_content_alerts: 'new_content_alerts', // ← add this
 
   // meditation_reminders
   meditation_reminder: 'meditation_reminders',
   meditation_complete: 'meditation_reminders',
+  meditation_reminders: 'meditation_reminders', // ← add this
 
   // community_updates
   community_like: 'community_updates',
@@ -46,6 +48,7 @@ const NOTIFICATION_TYPE_MAP: Record<string, NotificationSettingKey> = {
   subscription_created: 'notification_reminder',
   subscription_renewed: 'notification_reminder',
   dig_completed: 'notification_reminder',
+  notification_reminder: 'notification_reminder', // ← add this
 };
 
 @Injectable()
