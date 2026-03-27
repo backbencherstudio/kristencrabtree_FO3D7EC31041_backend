@@ -61,8 +61,15 @@ export class FirebaseService {
   private async isAllowed(userId: string, type: string): Promise<boolean> {
     const settingKey = NOTIFICATION_TYPE_MAP[type];
 
+    console.log(
+      `🔍 isAllowed check — userId: ${userId}, type: ${type}, settingKey: ${settingKey}`,
+    );
+
     // Type not in map — always allow
-    if (!settingKey) return true;
+    if (!settingKey) {
+      console.log(`⚠️ Type "${type}" not in map — skipping check, allowing`);
+      return true;
+    }
 
     const settings = await this.prisma.notificationSettings.findUnique({
       where: { user_id: userId },
@@ -74,10 +81,19 @@ export class FirebaseService {
       },
     });
 
-    // No settings record = all enabled by default
-    if (!settings) return true;
+    console.log(`📋 Settings for user ${userId}:`, settings);
 
-    return settings[settingKey] === true;
+    // No settings record = all enabled by default
+    if (!settings) {
+      console.log(`⚠️ No settings record found for user ${userId} — allowing`);
+      return true;
+    }
+
+    const result = settings[settingKey] === true;
+    console.log(
+      `✅ Setting "${settingKey}" = ${settings[settingKey]} → allowed: ${result}`,
+    );
+    return result;
   }
 
   // ── Build FCM message ────────────────────────────────────────────────────
