@@ -251,102 +251,61 @@ export class QuotesService {
   }
   async getRandomAdminQuote(userId: string) {
     try {
-      const userPlan = await SubscriptionManager(this.prisma, userId);
-
-      // For free users, check Redis cache first
-      if (userPlan.subscriptionName === 'free') {
-        const cachedRaw = await this.redis.get(`quote:daily:${userId}`);
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          return {
-            success: true,
-            message: 'Random admin quote retrieved',
-            data: cached,
-          };
-        }
-      }
-
-      // ✅ Build where clause based on whether user has focus areas
-      const whereClause: any = {
-        user: { type: 'admin' },
-      };
-
-      // Only filter by focus_area if user has preferences set
-      if (userPlan.focus_area && userPlan.focus_area.length > 0) {
-        whereClause.type = {
-          hasSome: userPlan.focus_area,
-        };
-      }
-
-      // ✅ Get total count with same filter
+      // ── Get total count of all quotes ─────────────────────────
       const total = await this.prisma.quote.count({
-        where: whereClause,
+        where: {
+          deleted_at: null,
+          status: true,
+        },
       });
 
       if (total === 0) {
         return {
           success: true,
-          message: 'No admin quotes found matching your preferences',
-          data: null,
+          message: 'No quotes found',
+          data: [],
         };
       }
 
-      const randomIndex = Math.floor(Math.random() * total);
-
-      const quote = await this.prisma.quote.findFirst({
-        where: whereClause,
-        orderBy: { created_at: 'asc' },
-        skip: randomIndex,
-        take: 1,
-      });
-
-      // ✅ Check if quote exists before accessing properties
-      if (!quote) {
-        return {
-          success: false,
-          message: 'No quote found matching your preferences',
-        };
-      }
-
-      const favourite = await this.prisma.quoteReaction.findFirst({
+      // ── Fetch all quotes ──────────────────────────────────────
+      const allQuotes = await this.prisma.quote.findMany({
         where: {
-          userId: userId,
-          qouteId: quote.id,
+          deleted_at: null,
+          status: true,
         },
       });
 
-      const quoteWithMeta = {
-        ...quote,
-        isFavourite: !!favourite,
-        shareLink: this.generateShareLink(quote.id), // ✅ Add share link here
-      };
+      // ── Shuffle and pick 5 random quotes ─────────────────────
+      const shuffled = allQuotes.sort(() => Math.random() - 0.5);
+      const randomFive = shuffled.slice(0, Math.min(5, shuffled.length));
 
-      // Cache the quote for free users until midnight
-      if (userPlan.subscriptionName === 'free') {
-        const now = new Date();
-        const midnight = new Date();
-        midnight.setHours(24, 0, 0, 0);
-        const secondsUntilMidnight = Math.floor(
-          (midnight.getTime() - now.getTime()) / 1000,
-        );
+      // ── Attach isFavourite + shareLink to each ────────────────
+      const quotesWithMeta = await Promise.all(
+        randomFive.map(async (quote) => {
+          const favourite = await this.prisma.quoteReaction.findFirst({
+            where: {
+              userId: userId,
+              qouteId: quote.id,
+            },
+          });
 
-        await this.redis.set(
-          `quote:daily:${userId}`,
-          JSON.stringify(quoteWithMeta),
-          'EX',
-          secondsUntilMidnight,
-        );
-      }
+          return {
+            ...quote,
+            isFavourite: !!favourite,
+            shareLink: this.generateShareLink(quote.id),
+          };
+        }),
+      );
 
       return {
         success: true,
-        message: 'Random admin quote retrieved',
-        data: quoteWithMeta,
+        message: 'Random quotes retrieved',
+        data: quotesWithMeta,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to fetch random quote',
+        message: 'Failed to fetch random quotes',
         error: error.message || error,
       };
     }

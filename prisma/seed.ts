@@ -223,7 +223,7 @@ async function main() {
           stripePrice = await stripe.prices.create({
             product: product.id,
             unit_amount: plan.price_in_cents,
-            currency: 'usd',
+            currency: '$',
             // Recurring plans get a recurring object; lifetime gets none
             ...(plan.interval
               ? { recurring: { interval: plan.interval } }
