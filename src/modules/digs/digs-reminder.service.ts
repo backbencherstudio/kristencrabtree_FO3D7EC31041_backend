@@ -10,93 +10,98 @@ export class DigsReminderService {
     private readonly firebaseService: FirebaseService,
   ) {}
 
-  // ── Daily Dig + Journal reminder — 9 AM ────────────────────────────────
+  // ── Daily Dig + Journal reminder — every 1 minute (TESTING) ───────────
   @Cron('* * * * *')
   async sendDigAndJournalReminders() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Only fetch users where notification_reminder is true or no settings row
     const users = await this.prisma.user.findMany({
-      where: { type: 'user', fcm_token: { not: null } },
+      where: {
+        type: 'user',
+        fcm_token: { not: null },
+        OR: [
+          { notificationSettings: null }, // no settings = default on
+          { notificationSettings: { notification_reminder: true } },
+        ],
+      },
       include: { notificationSettings: true },
     });
 
     for (const user of users) {
-      const settings = user.notificationSettings;
+      // ── Dig reminder ────────────────────────────────────────────────
+      const todayDig = await this.prisma.userDailyDig.findFirst({
+        where: {
+          userId: user.id,
+          assignedAt: { gte: today },
+        },
+      });
 
-      // ── Dig reminder (notification_reminder toggle) ──────────────────
-      if (!settings || settings.notification_reminder) {
-        const todayDig = await this.prisma.userDailyDig.findFirst({
-          where: {
-            userId: user.id,
-            assignedAt: { gte: today },
+      if (!todayDig) {
+        await this.firebaseService.sendToOne(
+          user.fcm_token,
+          {
+            title: 'Time to Dig! 🌱',
+            body: "Don't forget your daily Dig! Take a moment for yourself today.",
+            data: { screen: 'DigsScreen' },
           },
-        });
-
-        if (!todayDig) {
-          await this.firebaseService.sendToOne(
-            user.fcm_token,
-            {
-              title: 'Time to Dig! 🌱',
-              body: "Don't forget your daily Dig! Take a moment for yourself today.",
-              data: { screen: 'DigsScreen' },
-            },
-            {
-              receiverId: user.id,
-              type: 'notification_reminder',
-              entityId: user.id,
-            },
-          );
-        }
+          {
+            receiverId: user.id,
+            type: 'notification_reminder',
+            entityId: user.id,
+          },
+        );
       }
 
-      // ── Journal reminder (notification_reminder toggle) ──────────────
-      if (!settings || settings.notification_reminder) {
-        const todayJournal = await this.prisma.journel.findFirst({
-          where: {
-            user_id: user.id,
-            created_at: { gte: today },
-          },
-        });
+      // ── Journal reminder ─────────────────────────────────────────────
+      const todayJournal = await this.prisma.journel.findFirst({
+        where: {
+          user_id: user.id,
+          created_at: { gte: today },
+        },
+      });
 
-        if (!todayJournal) {
-          await this.firebaseService.sendToOne(
-            user.fcm_token,
-            {
-              title: 'Time to Journal ✍️',
-              body: "Don't forget to write your journal today. Take a moment to reflect.",
-              data: { screen: 'JournalScreen' },
-            },
-            {
-              receiverId: user.id,
-              type: 'notification_reminder',
-              entityId: user.id,
-            },
-          );
-        }
+      if (!todayJournal) {
+        await this.firebaseService.sendToOne(
+          user.fcm_token,
+          {
+            title: 'Time to Journal ✍️',
+            body: "Don't forget to write your journal today. Take a moment to reflect.",
+            data: { screen: 'JournalScreen' },
+          },
+          {
+            receiverId: user.id,
+            type: 'notification_reminder',
+            entityId: user.id,
+          },
+        );
       }
     }
 
     console.log('✅ Dig + Journal reminders sent at', new Date().toISOString());
   }
 
-  // ── Meditation reminder — 8 AM (meditation_reminders toggle) ───────────
+  // ── Meditation reminder — every 1 minute (TESTING) ─────────────────────
   @Cron('* * * * *')
   async sendMeditationReminders() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Only fetch users where meditation_reminders is true or no settings row
     const users = await this.prisma.user.findMany({
-      where: { type: 'user', fcm_token: { not: null } },
+      where: {
+        type: 'user',
+        fcm_token: { not: null },
+        OR: [
+          { notificationSettings: null },
+          { notificationSettings: { meditation_reminders: true } },
+        ],
+      },
       include: { notificationSettings: true },
     });
 
     for (const user of users) {
-      const settings = user.notificationSettings;
-
-      // Skip if user disabled meditation_reminders
-      if (settings && !settings.meditation_reminders) continue;
-
       const listenedToday = await this.prisma.meditationListener.findFirst({
         where: { userId: user.id },
       });
@@ -117,23 +122,27 @@ export class DigsReminderService {
         );
       }
     }
+
     console.log('✅ Meditation reminders sent at', new Date().toISOString());
   }
 
-  // ── New content alert — every Monday 10 AM (new_content_alerts toggle) ─
+  // ── New content alert — every 1 minute (TESTING) ───────────────────────
   @Cron('* * * * *')
   async sendNewContentAlerts() {
+    // Only fetch users where new_content_alerts is true or no settings row
     const users = await this.prisma.user.findMany({
-      where: { type: 'user', fcm_token: { not: null } },
+      where: {
+        type: 'user',
+        fcm_token: { not: null },
+        OR: [
+          { notificationSettings: null },
+          { notificationSettings: { new_content_alerts: true } },
+        ],
+      },
       include: { notificationSettings: true },
     });
 
     for (const user of users) {
-      const settings = user.notificationSettings;
-
-      // Skip if user disabled new_content_alerts
-      if (settings && !settings.new_content_alerts) continue;
-
       await this.firebaseService.sendToOne(
         user.fcm_token,
         {
@@ -148,6 +157,7 @@ export class DigsReminderService {
         },
       );
     }
+
     console.log('✅ New content alerts sent at', new Date().toISOString());
   }
 }

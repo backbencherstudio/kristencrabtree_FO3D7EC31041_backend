@@ -54,13 +54,13 @@ export class NotificationService {
           { receiver_id: { equals: null } },
         ];
       }
-      // else if (userDetails.type == Role.VENDOR) {
-      //   where_condition['receiver_id'] = user_id;
-      // }
 
       const notifications = await this.prisma.notification.findMany({
         where: {
           ...where_condition,
+        },
+        orderBy: {
+          created_at: 'desc',
         },
         select: {
           id: true,
@@ -76,14 +76,6 @@ export class NotificationService {
               avatar: true,
             },
           },
-          // receiver: {
-          //   select: {
-          //     id: true,
-          //     name: true,
-          //     email: true,
-          //     avatar: true,
-          //   },
-          // },
           notification_event: {
             select: {
               id: true,
@@ -94,7 +86,6 @@ export class NotificationService {
         },
       });
 
-      // add url to avatar
       if (notifications.length > 0) {
         for (const notification of notifications) {
           if (notification.sender && notification.sender.avatar) {
@@ -102,12 +93,6 @@ export class NotificationService {
               appConfig().storageUrl.avatar + notification.sender.avatar,
             );
           }
-
-          // if (notification.receiver && notification.receiver.avatar) {
-          //   notification.receiver['avatar_url'] = SojebStorage.url(
-          //     appConfig().storageUrl.avatar + notification.receiver.avatar,
-          //   );
-          // }
         }
       }
 
