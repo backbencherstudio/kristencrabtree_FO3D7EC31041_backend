@@ -16,14 +16,13 @@ export class DigsReminderService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Only fetch users where notification_reminder is true or no settings row
     const users = await this.prisma.user.findMany({
       where: {
         type: 'user',
         fcm_token: { not: null },
         OR: [
-          { notificationSettings: null }, // no settings = default on
-          { notificationSettings: { notification_reminder: true } },
+          { notificationSettings: { is: null } },
+          { notificationSettings: { is: { notification_reminder: true } } },
         ],
       },
       include: { notificationSettings: true },
@@ -88,14 +87,13 @@ export class DigsReminderService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Only fetch users where meditation_reminders is true or no settings row
     const users = await this.prisma.user.findMany({
       where: {
         type: 'user',
         fcm_token: { not: null },
         OR: [
-          { notificationSettings: null },
-          { notificationSettings: { meditation_reminders: true } },
+          { notificationSettings: { is: null } },
+          { notificationSettings: { is: { meditation_reminders: true } } },
         ],
       },
       include: { notificationSettings: true },
@@ -129,14 +127,13 @@ export class DigsReminderService {
   // ── New content alert — every 1 minute (TESTING) ───────────────────────
   @Cron('* * * * *')
   async sendNewContentAlerts() {
-    // Only fetch users where new_content_alerts is true or no settings row
     const users = await this.prisma.user.findMany({
       where: {
         type: 'user',
         fcm_token: { not: null },
         OR: [
-          { notificationSettings: null },
-          { notificationSettings: { new_content_alerts: true } },
+          { notificationSettings: { is: null } },
+          { notificationSettings: { is: { new_content_alerts: true } } },
         ],
       },
       include: { notificationSettings: true },
