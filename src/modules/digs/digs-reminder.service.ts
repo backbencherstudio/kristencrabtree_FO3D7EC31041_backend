@@ -10,8 +10,8 @@ export class DigsReminderService {
     private readonly firebaseService: FirebaseService,
   ) {}
 
-  // ── Daily Dig + Journal reminder — every 1 minute (TESTING) ───────────
-  @Cron('* * * * *')
+  // ── Daily Dig + Journal reminder — 8:00 AM UTC ────────────────────────
+  @Cron('0 8 * * *', { timeZone: 'UTC' })
   async sendDigAndJournalReminders() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -81,8 +81,8 @@ export class DigsReminderService {
     console.log('✅ Dig + Journal reminders sent at', new Date().toISOString());
   }
 
-  // ── Meditation reminder — every 1 minute (TESTING) ─────────────────────
-  @Cron('* * * * *')
+  // ── Meditation reminder — 7:00 AM UTC ──────────────────────────────────
+  @Cron('0 7 * * *', { timeZone: 'UTC' })
   async sendMeditationReminders() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -124,8 +124,8 @@ export class DigsReminderService {
     console.log('✅ Meditation reminders sent at', new Date().toISOString());
   }
 
-  // ── New content alert — every 1 minute (TESTING) ───────────────────────
-  @Cron('* * * * *')
+  // ── New content alert — 9:00 AM UTC every Monday ───────────────────────
+  @Cron('0 9 * * 1', { timeZone: 'UTC' })
   async sendNewContentAlerts() {
     const users = await this.prisma.user.findMany({
       where: {
