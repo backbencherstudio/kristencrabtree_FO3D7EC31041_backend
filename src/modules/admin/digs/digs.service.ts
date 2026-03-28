@@ -46,18 +46,13 @@ export class DigsService {
       });
 
       if (!user) {
-        return {
-          success: false,
-          message: 'Only admin can create this',
-        };
+        return { success: false, message: 'Only admin can create this' };
       }
-
-      console.log(createDigDto.type);
 
       const createdDig = await this.prisma.digs.create({
         data: {
           title: createDigDto.title,
-          type: { set: createDigDto.type ?? [] }, // ← default to [] if not sent
+          type: { set: createDigDto.type ?? [] },
           user_id: userid,
           layers: {
             create: createDigDto.layers.map((layer) => ({
@@ -69,17 +64,20 @@ export class DigsService {
               other: layer.other ?? false,
               other_text: layer.other_text,
               text: layer.text,
-              user_id: userid, // ← also missing, Layers has user_id
+              user_id: userid,
+              // only save correct_answer for Question and Experience layers
+              correct_answer:
+                layer.question_name === 'The_Question' ||
+                layer.question_name === 'The_Experience'
+                  ? (layer.correct_answer ?? null)
+                  : null,
             })),
           },
         },
         include: { layers: true },
       });
 
-      return {
-        success: true,
-        data: createdDig,
-      };
+      return { success: true, data: createdDig };
     } catch (error) {
       return {
         success: false,
@@ -409,43 +407,80 @@ export class DigsService {
     }
   }
 
-  async updateDig(id, userId, updateDig) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-      },
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+  async updateDig(id: string, userId: string, updateDig: UpdateDigDto) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId, type: 'admin' },
+      });
 
-    const updated = await this.prisma.digs.update({
-      where: {
-        id,
-      },
-      data: {
-        title: updateDig.title,
-        layers: {
-          deleteMany: {}, // delete existing layers
-          create: updateDig.layers?.map((layer) => ({
-            question_name: layer.question_name,
-            question_type: layer.question_type,
-            point: layer.point,
-            question: layer.question,
-            options: layer.options,
-            other: layer.other,
-            other_text: layer.other_text,
-            text: layer.text,
-          })),
+      if (!user) {
+        return { success: false, message: 'Only admin can update this' };
+      }
+
+      const existing = await this.prisma.digs.findFirst({
+        where: { id, deleted_at: null },
+        include: { layers: { select: { id: true } } },
+      });
+
+      if (!existing) {
+        return { success: false, message: 'Dig not found' };
+      }
+
+      // Soft-delete existing layers instead of hard deleteMany,
+      // so DigResponse foreign keys are preserved in user history.
+      const existingLayerIds = existing.layers.map((l) => l.id);
+      if (existingLayerIds.length > 0) {
+        await this.prisma.layers.updateMany({
+          where: { id: { in: existingLayerIds } },
+          data: { deleted_at: new Date() },
+        });
+      }
+
+      // Create new layers fresh
+      const updated = await this.prisma.digs.update({
+        where: { id },
+        data: {
+          title: updateDig.title,
+          type: { set: updateDig.type ?? [] },
+          layers: {
+            create: updateDig.layers?.map((layer) => ({
+              question_name: layer.question_name,
+              question_type: layer.question_type,
+              point: layer.point,
+              question: layer.question,
+              options: layer.options ?? [],
+              other: layer.other ?? false,
+              other_text: layer.other_text,
+              text: layer.text,
+              user_id: userId,
+              correct_answer:
+                layer.question_name === 'The_Question' ||
+                layer.question_name === 'The_Experience'
+                  ? (layer.correct_answer ?? null)
+                  : null,
+            })),
+          },
         },
-      },
-    });
+        include: {
+          // Only return active (non-deleted) layers in the response
+          layers: {
+            where: { deleted_at: null },
+          },
+        },
+      });
 
-    return {
-      success: true,
-      message: 'Dig Update Successful',
-      updated,
-    };
+      return {
+        success: true,
+        message: 'Dig Update Successful',
+        data: updated,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Error updating dig',
+        error: error.message,
+      };
+    }
   }
 
   async deleteDig(id, userId) {

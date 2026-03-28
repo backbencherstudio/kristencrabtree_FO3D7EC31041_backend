@@ -828,18 +828,27 @@ model Layers {
   dig_id String
   dig    Digs   @relation(fields: [dig_id], references: [id], onDelete: Cascade)
 
-  question_name String?
+  question_name LayerTitle?  // ← changed from String? to enum
   question_type Type?
   point         Int?
   question      String?
 
-  options      String[]
-  other        Boolean?
-  other_text   String?
-  text         String?
+  options        String[]
+  other          Boolean?
+  other_text     String?
+  text           String?
+  correct_answer String?    // ← new field
+
   digResponses DigResponse[]
 
   @@map("layers")
+}
+
+enum LayerTitle {
+  The_Question
+  The_Journal
+  The_Experience
+  The_Reflection
 }
 
 model DigResponse {

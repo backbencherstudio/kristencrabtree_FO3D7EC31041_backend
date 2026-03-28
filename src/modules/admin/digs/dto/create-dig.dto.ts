@@ -10,20 +10,21 @@ import {
   ValidateNested,
   IsArray,
 } from 'class-validator';
-import { Focus_Area, Type as LayerType } from '@prisma/client';
+import { Focus_Area, LayerTitle, Type as LayerType } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
+
 
 export class CreateDigDto {
   @IsString()
   title: string;
 
-  @IsOptional() // ← already optional ✅
+  @IsOptional()
   @IsArray()
   @IsEnum(Focus_Area, { each: true })
   @Transform(({ value }) =>
     Array.isArray(value) ? value : value ? [value] : [],
   )
-  type?: Focus_Area[]; // ← add ? here
+  type?: Focus_Area[];
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -32,9 +33,9 @@ export class CreateDigDto {
 }
 
 export class CreateLayerDto {
-  @IsString()
+  @IsEnum(LayerTitle) // ← now enum, not free string
   @IsOptional()
-  question_name?: string;
+  question_name?: LayerTitle;
 
   @IsEnum(LayerType)
   @IsOptional()
@@ -65,6 +66,10 @@ export class CreateLayerDto {
   @IsString()
   @IsOptional()
   text?: string;
+
+  @IsString()
+  @IsOptional()
+  correct_answer?: string; // ← new field, only for Question & Experience
 }
 
 export class SaveResponseItemDto {

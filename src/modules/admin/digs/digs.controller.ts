@@ -24,7 +24,7 @@ export class DigsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() createDigDto: CreateDigDto, @Req() req: any) {
-    console.log(createDigDto)
+    console.log(createDigDto);
     const userId = req.user?.userId;
     return this.digsService.create(userId, createDigDto);
   }
@@ -52,6 +52,7 @@ export class DigsController {
     return this.digsService.saveUserResponses(userId, digId, body.answers);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findOne(@Param('id') id: string, @Req() req: any) {
     return this.digsService.getSingleDig(id);
@@ -59,9 +60,9 @@ export class DigsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async findAll(@Req() req: any,@Query() paginationDto:PaginationDto) {
+  async findAll(@Req() req: any, @Query() paginationDto: PaginationDto) {
     const userId = req.user?.userId;
-    return this.digsService.getAlldigs(userId,paginationDto);
+    return this.digsService.getAlldigs(userId, paginationDto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -77,10 +78,7 @@ export class DigsController {
 
   @UseGuards(JwtAuthGuard)
   @Delete('delete/:id')
-  async deleteDig(
-    @Param('id') id: string,
-    @Req() req: any,
-  ) {
+  async deleteDig(@Param('id') id: string, @Req() req: any) {
     const userId = req.user.userId;
     return await this.digsService.deleteDig(id, userId);
   }
