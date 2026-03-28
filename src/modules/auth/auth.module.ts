@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import appConfig from '../../config/app.config';
 import { MailModule } from '../../mail/mail.module';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { FirebaseModule } from '../firebase/firebase.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -26,6 +27,7 @@ import { LocalStrategy } from './strategies/local.strategy';
     }),
     PrismaModule,
     MailModule,
+    FirebaseModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -34,6 +36,11 @@ import { LocalStrategy } from './strategies/local.strategy';
     JwtStrategy,
     GoogleStrategy,
     JwtStrategy2,
+    {
+      provide: 'FIREBASE_AUTH',
+      useFactory: (firebaseApp: any) => firebaseApp.auth(),
+      inject: ['FIREBASE_ADMIN'],
+    },
   ],
   exports: [AuthService],
 })

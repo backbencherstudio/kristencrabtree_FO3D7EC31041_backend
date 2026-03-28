@@ -42,21 +42,21 @@ export class UserRepository {
       where: {
         id: userId,
       },
-      include: {
-        role_users: {
-          include: {
-            role: {
-              include: {
-                permission_roles: {
-                  include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      // include: {
+      //   role_users: {
+      //     include: {
+      //       role: {
+      //         include: {
+      //           permission_roles: {
+      //             include: {
+      //               permission: true,
+      //             },
+      //           },
+      //         },
+      //       },
+      //     },
+      //   },
+      // },
     });
     return user;
   }
