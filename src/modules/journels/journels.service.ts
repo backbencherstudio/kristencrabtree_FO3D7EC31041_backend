@@ -152,41 +152,59 @@ export class JournelsService {
     userId: string,
     paginationDto: { page?: number; perPage?: number } = {},
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return { success: false, message: 'User not found' };
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
 
     const page = Number(paginationDto.page) || 1;
     const perPage = Number(paginationDto.perPage) || 10;
     const skip = (page - 1) * perPage;
 
-    const [total, journals] = await this.prisma.$transaction([
-      this.prisma.journel.count({ where: { user_id: userId } }),
-      this.prisma.journel.findMany({
-        where: { user_id: userId },
-        skip,
-        take: perPage,
-        orderBy: { created_at: 'desc' },
-        include: {
-          _count: { select: { likeJournels: true } },
-          user: {
-            select: {
-              id: true,
-              first_name: true,
-              last_name: true,
-              avatar: true,
-            },
+    // ✅ Role-based where condition
+    const whereClause = user.type === 'admin' ? {} : { user_id: userId };
+
+    // ✅ Total count
+    const total = await this.prisma.journel.count({
+      where: whereClause,
+    });
+
+    // ✅ Fetch journals
+    const journals = await this.prisma.journel.findMany({
+      where: whereClause,
+      skip,
+      take: perPage,
+      orderBy: { created_at: 'desc' },
+      include: {
+        _count: { select: { likeJournels: true } },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            avatar: true,
           },
-          likeJournels: { where: { userId } },
         },
-      }),
-    ]);
+        likeJournels: {
+          where: { userId }, // for isLiked
+        },
+      },
+    });
 
     if (journals.length === 0) {
       return {
         success: true,
-        message: 'No journals found. Create your first one!',
+        message: 'No journals found.',
         data: [],
-        pagination: { total: 0, page, perPage, totalPages: 0 },
+        pagination: {
+          total: 0,
+          page,
+          perPage,
+          totalPages: 0,
+        },
       };
     }
 
