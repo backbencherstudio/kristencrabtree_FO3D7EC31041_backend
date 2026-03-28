@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import Stripe from 'stripe';
 
 const prisma = new PrismaClient();
 
@@ -203,9 +204,187 @@ async function main() {
     }
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // ── DUMMY DATA ──────────────────────────────────────────────────────────────
-  // ════════════════════════════════════════════════════════════════════════════
+  // ── Plans (DB + Stripe) ────────────────────────────────────────────────────
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+  const plansDisplayData = [
+    {
+      id: 'plan_free',
+      title: 'Free',
+      subtitle: 'Perfect for getting started',
+      description: 'Start the dig—no pressure, just curiosity.',
+      price: '0.00',
+      price_in_cents: 0,
+      tag: 'free',
+      interval: null,
+      features: [
+        'Limited journaling entries',
+        'Daily quotes and inspiration',
+        'Three question/exercise per week',
+        'Read-only community access',
+        'Basic progress tracking',
+        'Ad-supported experience',
+      ],
+    },
+    {
+      id: 'plan_monthly',
+      title: 'Monthly',
+      subtitle: 'For those ready to go deeper',
+      description: 'For seekers who want presence to become a practice.',
+      price: '8.88',
+      price_in_cents: 888,
+      tag: 'popular',
+      interval: 'month' as const,
+      features: [
+        'Unlimited text & audio journaling',
+        'Unlimited scheduled exercises & questions',
+        'Full community participation (post & reply)',
+        'Join Murmuration & collaborative experiences',
+        'Access to live group sessions & one-on-one coaching',
+        'Contribute personal inspirational messages',
+        'Who Am I & Mind Expansion experiences',
+        'Exclusive curated meditations',
+        'Ad-free experience',
+        'Advanced progress analytics & export',
+      ],
+    },
+    {
+      id: 'plan_annual',
+      title: 'Annual',
+      subtitle: 'For those ready to go deeper',
+      description: "For those who've decided: no more half-hearted living.",
+      price: '53.28',
+      price_in_cents: 5328,
+      tag: '50_off',
+      interval: 'year' as const,
+      features: [
+        'Unlimited text & audio journaling',
+        'Unlimited scheduled exercises & questions',
+        'Full community participation (post & reply)',
+        'Join Murmuration & collaborative experiences',
+        'Access to live group sessions & one-on-one coaching',
+        'Contribute personal inspirational messages',
+        'Who Am I & Mind Expansion experiences',
+        'Exclusive curated meditations',
+        'Ad-free experience',
+        'Advanced progress analytics & export',
+      ],
+    },
+    {
+      id: 'plan_lifetime',
+      title: 'Lifetime',
+      subtitle: 'The Lifetime Access',
+      description: 'For those who are all in.',
+      price: '222.22',
+      price_in_cents: 22222,
+      tag: 'special',
+      interval: null as null,
+      features: [
+        'Everything in Premium, forever',
+        'All future premium content & features',
+        'Exclusive "The Dig Never Ends" special-edition tee',
+        'One-time 45-minute private Excavation Session with Kristen',
+        'Priority support & early access to new features',
+        'Lifetime community member status',
+      ],
+    },
+  ];
+
+  for (const plan of plansDisplayData) {
+    const existing = await prisma.plans.findUnique({ where: { id: plan.id } });
+
+    if (existing) {
+      console.log(`✅ Display plan already exists: ${plan.title}`);
+      continue;
+    }
+
+    let stripe_product_id: string | null = null;
+    let stripe_price_id: string | null = null;
+
+    if (plan.price_in_cents > 0) {
+      try {
+        const existingProducts = await stripe.products.search({
+          query: `name:'${plan.title}' AND active:'true'`,
+        });
+
+        let product: Stripe.Product;
+
+        if (existingProducts.data.length > 0) {
+          product = existingProducts.data[0];
+          console.log(
+            `♻️  Reusing Stripe product: ${product.id} (${plan.title})`,
+          );
+        } else {
+          product = await stripe.products.create({
+            name: plan.title,
+            description: plan.description,
+            metadata: { plan_id: plan.id },
+          });
+          console.log(
+            `🔷 Stripe product created: ${product.id} (${plan.title})`,
+          );
+        }
+
+        stripe_product_id = product.id;
+
+        const existingPrices = await stripe.prices.list({
+          product: product.id,
+          active: true,
+        });
+
+        const matchingPrice = existingPrices.data.find((p) => {
+          if (p.unit_amount !== plan.price_in_cents) return false;
+          if (plan.interval) {
+            return p.recurring?.interval === plan.interval;
+          }
+          return p.recurring === null;
+        });
+
+        let stripePrice: Stripe.Price;
+
+        if (matchingPrice) {
+          stripePrice = matchingPrice;
+          console.log(
+            `♻️  Reusing Stripe price: ${stripePrice.id} (${plan.title})`,
+          );
+        } else {
+          stripePrice = await stripe.prices.create({
+            product: product.id,
+            unit_amount: plan.price_in_cents,
+            currency: 'usd',
+            ...(plan.interval
+              ? { recurring: { interval: plan.interval } }
+              : {}),
+            metadata: { plan_id: plan.id },
+          });
+          console.log(
+            `🔷 Stripe price created: ${stripePrice.id} (${plan.title})`,
+          );
+        }
+
+        stripe_price_id = stripePrice.id;
+      } catch (err) {
+        console.error(`❌ Stripe error for plan "${plan.title}":`, err);
+        throw err;
+      }
+    }
+
+    await prisma.plans.create({
+      data: {
+        id: plan.id,
+        title: plan.title,
+        subtitle: plan.subtitle,
+        description: plan.description,
+        price: plan.price,
+        tag: plan.tag,
+        features: plan.features,
+        stripe_product_id,
+        stripe_price_id,
+      },
+    });
+
+    console.log(`🚀 Plan created in DB: ${plan.title}`);
+  }
 
   // ── Quotes ──────────────────────────────────────────────────────────────────
   console.log('\n📖 Seeding Quotes...');
@@ -298,42 +477,42 @@ async function main() {
       meditation_name: 'Morning Stillness',
       meditation_description:
         'A gentle 10-minute guided meditation to start your day with clarity and intention. Focus on your breath and let go of yesterday.',
-      meditation_audio: 'https://example.com/audio/morning-stillness.mp3',
+      meditation_audio: 'storage/audio/morning-stillness.mp3',
       duration: '10:00',
     },
     {
       meditation_name: 'Body Scan for Deep Rest',
       meditation_description:
         'A progressive body scan from head to toe designed to release physical tension and invite deep relaxation.',
-      meditation_audio: 'https://example.com/audio/body-scan.mp3',
+      meditation_audio: 'storage/audio/body-scan.mp3',
       duration: '20:00',
     },
     {
       meditation_name: 'Emotional Release',
       meditation_description:
         'This practice gently guides you to acknowledge and release stored emotions through breath and visualization.',
-      meditation_audio: 'https://example.com/audio/emotional-release.mp3',
+      meditation_audio: 'storage/audio/emotional-release.mp3',
       duration: '15:00',
     },
     {
       meditation_name: 'Inner Silence',
       meditation_description:
         'A minimalist meditation that strips everything back to pure awareness. No guidance, just presence.',
-      meditation_audio: 'https://example.com/audio/inner-silence.mp3',
+      meditation_audio: 'storage/audio/inner-silence.mp3',
       duration: '08:00',
     },
     {
       meditation_name: 'Heart-Centered Breathing',
       meditation_description:
         'Breathe in compassion, breathe out tension. This heart-focused practice builds emotional resilience and self-love.',
-      meditation_audio: 'https://example.com/audio/heart-breathing.mp3',
+      meditation_audio: 'storage/audio/heart-breathing.mp3',
       duration: '12:00',
     },
     {
       meditation_name: 'Grounding in Nature',
       meditation_description:
         'Visualize yourself in a peaceful natural setting to restore your connection to the earth and your own body.',
-      meditation_audio: 'https://example.com/audio/grounding-nature.mp3',
+      meditation_audio: 'storage/audio/grounding-nature.mp3',
       duration: '18:00',
     },
   ];
@@ -846,7 +1025,7 @@ async function main() {
           digId,
           weekStart,
           position: pos + 1,
-          completed: pos === 0, // first one marked as completed
+          completed: pos === 0,
         },
       });
       console.log(`🚀 Weekly dig assigned: position ${pos + 1}`);
