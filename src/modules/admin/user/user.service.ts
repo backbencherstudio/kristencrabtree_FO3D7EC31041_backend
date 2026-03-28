@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -6,6 +11,7 @@ import { UserRepository } from '../../../common/repository/user/user.repository'
 import appConfig from '../../../config/app.config';
 import { SojebStorage } from '../../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../../common/helper/date.helper';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -35,36 +41,64 @@ export class UserService {
   }
 
   async findAll({
-    q,
-    type,
+    status,
     approved,
+    joined,
+    plan,
+    paginationDto,
   }: {
     q?: string;
-    type?: string;
+    status?: string;
     approved?: string;
+    joined?: string;
+    plan?: string;
+    paginationDto: { page: number; perPage: number };
   }) {
     try {
-      const where_condition = {};
-      if (q) {
-        where_condition['OR'] = [
-          { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-        ];
-      }
+      const page = paginationDto.page || 1;
+      const perPage = paginationDto.perPage || 10;
+      const skip = (page - 1) * perPage;
+      const take = perPage;
 
-      if (type) {
-        where_condition['type'] = type;
+      const where_condition: Prisma.UserWhereInput = {};
+
+      if (status) {
+        where_condition['status'] = parseInt(status);
       }
 
       if (approved) {
         where_condition['approved_at'] =
           approved == 'approved' ? { not: null } : { equals: null };
       }
+      if (joined) {
+        const start = new Date(`${joined}T00:00:00.000Z`);
+        const end = new Date(`${joined}T23:59:59.999Z`);
+
+        where_condition['created_at'] = {
+          gte: start,
+          lte: end,
+        };
+      }
+      if (plan) {
+        where_condition.subscriptionPlan = {
+          equals: plan,
+          mode: 'insensitive',
+        };
+      }
+      const total = await this.prisma.user.count({
+        where: {
+          ...where_condition,
+          type: 'user',
+        },
+      });
 
       const users = await this.prisma.user.findMany({
         where: {
           ...where_condition,
+          type: 'user',
         },
+        skip,
+        take,
         select: {
           id: true,
           name: true,
@@ -72,15 +106,23 @@ export class UserService {
           phone_number: true,
           address: true,
           type: true,
+          status: true,
           approved_at: true,
           created_at: true,
           updated_at: true,
+          subscriptionPlan: true,
         },
       });
 
       return {
         success: true,
         data: users,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+        },
       };
     } catch (error) {
       return {
@@ -223,5 +265,37 @@ export class UserService {
         message: error.message,
       };
     }
+  }
+
+  async userAction(id: string, actionDto: { status?: number }) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (actionDto.status === undefined) {
+      throw new BadRequestException('Status is required');
+    }
+
+    if (user.status === actionDto.status) {
+      throw new BadRequestException(
+        'You cannot update the user with the same status',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        status: actionDto.status,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'User status updated successfully',
+    };
   }
 }
