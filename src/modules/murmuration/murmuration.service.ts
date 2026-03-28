@@ -9,6 +9,7 @@ import { StringHelper } from 'src/common/helper/string.helper';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import appConfig from 'src/config/app.config';
 import { MurmurationType } from '@prisma/client';
+import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 
 @Injectable()
 export class MurmurationService {
@@ -30,6 +31,15 @@ export class MurmurationService {
 
       if (!user) {
         return { success: false, message: 'User not found' };
+      }
+
+      const userPlan = await SubscriptionManager(this.prisma, user.id);
+
+      if (userPlan.subscriptionName === 'free') {
+        return {
+          success: false,
+          message: 'Upgrade your plan to Post',
+        };
       }
 
       const data: any = {
@@ -172,7 +182,8 @@ export class MurmurationService {
       };
     }
   }
-  async findAll(user_id: string) {
+
+  async findAll(user_id: string, cursor: string) {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: user_id },
@@ -187,6 +198,10 @@ export class MurmurationService {
       }
 
       const murmurations = await this.prisma.murmuration.findMany({
+        take: 10,
+        skip: cursor ? 1 : 0,
+        cursor: cursor ? { id: cursor } : undefined,
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
         select: {
           id: true,
           type: true,
@@ -235,10 +250,18 @@ export class MurmurationService {
         isLiked: m.murmurationLikes.length > 0,
       }));
 
+      const nextCursor =
+        murmurations.length === 10
+          ? murmurations[murmurations.length - 1].id
+          : null;
+
       return {
         success: true,
         message: 'Murmurations fetched successfully',
         data,
+        meta: {
+          nextCursor,
+        },
       };
     } catch (error) {
       return {
@@ -407,8 +430,27 @@ export class MurmurationService {
     }
   }
 
-  remove(id: string) {
-    return `This action removes a #${id} murmuration`;
+  async remove(id: string, userId: string) {
+    const ifDeleted = await this.prisma.murmuration.delete({
+      where: {
+        id: id,
+        user_id: userId,
+      },
+      include: {
+        comments: true,
+      },
+    });
+    if (!ifDeleted) {
+      return {
+        success: false,
+        message:
+          'murmuration was not found or you do not have proper access to delete it',
+      };
+    }
+    return {
+      success: true,
+      message: 'Murmuration deleted Successfully',
+    };
   }
 
   //comments , reply , like and share
@@ -467,7 +509,9 @@ export class MurmurationService {
         message: 'Comments fetched successfully',
         data: comments,
       };
-    } catch (error) {}
+    } catch (error) {
+      console.log(error);
+    }
   }
   async toggleLikeForMurmuration(userId: string, murmurationId: string) {
     try {
@@ -526,4 +570,4 @@ export class MurmurationService {
     }
   }
   async shareMurmuration() {}
-}
+  }

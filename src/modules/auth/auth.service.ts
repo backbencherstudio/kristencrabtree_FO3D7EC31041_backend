@@ -2,13 +2,13 @@
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import Redis from 'ioredis';
-
 //internal imports
 import { DateHelper } from '../../common/helper/date.helper';
 import { StringHelper } from '../../common/helper/string.helper';
@@ -22,14 +22,17 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
 import { DigsService } from '../admin/digs/digs.service';
-import e from 'express';
-
+import * as bcrypt from 'bcrypt';
+import { SubscriptionManager } from 'src/common/helper/subscription.manager';
+import { calculateUserDigPoints, getLevelXpRange } from './helper';
+import admin from 'src/config/firebase-admin';
 @Injectable()
 export class AuthService {
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
     private mailService: MailService,
+    @Inject('FIREBASE_AUTH') private firebaseAuth: any,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -49,7 +52,10 @@ export class AuthService {
           type: true,
           gender: true,
           date_of_birth: true,
+          subscriptionPlan: true,
           created_at: true,
+          currentLevel: true,
+          acheivedXp: true,
         },
       });
 
@@ -57,18 +63,29 @@ export class AuthService {
         return { success: false, message: 'User not found' };
       }
 
-      const pointsResult = await new DigsService(this.prisma).getPointsdict(
-        userId,
-      );
-      const xp = pointsResult && pointsResult.data ? pointsResult.data : 0;
+      // const pointsResult = await calculateUserDigPoints(this.prisma, userId);
+      // const xp = pointsResult ?? 0;
 
-      const userData = { ...user, xp };
+      // if (user.type !== 'admin') {
+      //   const permissions = await SubscriptionManager(this.prisma, userId);
 
+      //   if (!permissions) {
+      //     return { success: false, message: 'Permission data not found' };
+      //   }
+      // }
+
+      const userData = { ...user };
       if (user.avatar) {
         userData['avatar_url'] = SojebStorage.url(
           appConfig().storageUrl.avatar + user.avatar,
         );
       }
+
+      // Current level XP range (for progress / "total xp of current level")
+      const level = user.currentLevel ? user.currentLevel : 1;
+      const levelXp = getLevelXpRange(level);
+      userData['currentLevelMinXp'] = levelXp.minXp;
+      userData['currentLevelMaxXp'] = levelXp.maxXp;
 
       return { success: true, data: userData };
     } catch (error) {
@@ -141,6 +158,36 @@ export class AuthService {
         data.avatar = fileName;
       }
       const user = await UserRepository.getUserDetails(userId);
+      if (
+        updateUserDto.current_password &&
+        updateUserDto.new_password &&
+        updateUserDto.confirm_password
+      ) {
+        if (updateUserDto.new_password !== updateUserDto.confirm_password) {
+          throw new BadRequestException(
+            'New password and confirm password do not match',
+          );
+        }
+
+        // Compare the current password with the hashed password in the database
+        const isCurrentPasswordValid = await bcrypt.compare(
+          updateUserDto.current_password,
+          user.password,
+        );
+
+        if (!isCurrentPasswordValid) {
+          throw new BadRequestException('Current password is incorrect');
+        }
+
+        // Hash the new password before saving it
+        const hashedNewPassword = await bcrypt.hash(
+          updateUserDto.new_password,
+          appConfig().security.salt,
+        );
+
+        // Add the hashed new password to the data object
+        data.password = hashedNewPassword;
+      }
       if (user) {
         await this.prisma.user.update({
           where: { id: userId },
@@ -221,24 +268,35 @@ export class AuthService {
     }
   }
 
-  async login({ email, userId }) {
+  async login({
+    email,
+    userId,
+    fcmToken,
+  }: {
+    email: string;
+    userId: string;
+    fcmToken: string;
+  }) {
     try {
-      const payload = { email: email, sub: userId };
-      console.log("user::>>", payload)
-
+      const payload = { email, sub: userId };
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
       const user = await UserRepository.getUserDetails(userId);
 
-      // store refreshToken
+      // Save FCM token to user record
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { fcm_token: fcmToken },
+      });
+
+      // Store refreshToken in Redis
       await this.redis.set(
         `refresh_token:${user.id}`,
         refreshToken,
         'EX',
-        60 * 60 * 24 * 7, // 7 days in seconds
+        60 * 60 * 24 * 7,
       );
-
 
       return {
         success: true,
@@ -251,10 +309,95 @@ export class AuthService {
         type: user.type,
       };
     } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  async appleLogin(idToken: string, fcmToken?: string) {
+    try {
+      // 1. Verify Firebase ID token
+      const decoded = await this.firebaseAuth.verifyIdToken(idToken);
+      const { email, name, uid, picture } = decoded;
+
+      if (!email) throw new UnauthorizedException('No email in token');
+
+      // 2. Find or create user
+      let user = await this.prisma.user.findUnique({ where: { email } });
+
+      if (!user) {
+        // New user — create account
+        // Apple only sends name on FIRST login — store it immediately
+        const firstName = name?.split(' ')[0] || '';
+        const lastName = name?.split(' ').slice(1).join(' ') || '';
+
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            name: name || '',
+            first_name: firstName,
+            last_name: lastName,
+            firebaseUid: uid,
+            avatar: picture || null,
+            type: 'user',
+            fcm_token: fcmToken || null,
+          },
+        });
+
+        // Create user preferences
+        await this.prisma.userPreferences.create({
+          data: { user: { connect: { id: user.id } } },
+        });
+
+        // Create Stripe customer
+        const stripeCustomer = await StripePayment.createCustomer({
+          user_id: user.id,
+          email,
+          name: name || email,
+        });
+        if (stripeCustomer) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { billing_id: stripeCustomer.id },
+          });
+        }
+      } else {
+        // Existing user — update firebaseUid + fcm_token
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            firebaseUid: uid,
+            fcm_token: fcmToken || user.fcm_token,
+          },
+        });
+      }
+
+      // 3. Generate JWT
+      const payload = { sub: user.id, email: user.email };
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+      // 4. Store refresh token in Redis
+      await this.redis.set(
+        `refresh_token:${user.id}`,
+        refreshToken,
+        'EX',
+        60 * 60 * 24 * 7,
+      );
+
+      // 5. Return — no password field on Apple users
+      const { password, ...safeUser } = user as any;
       return {
-        success: false,
-        message: error.message,
+        success: true,
+        message: 'Logged in successfully via Apple',
+        user: safeUser,
+        authorization: {
+          type: 'bearer',
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        },
       };
+    } catch (err) {
+      throw new UnauthorizedException('Invalid Apple token');
     }
   }
 
@@ -334,6 +477,7 @@ export class AuthService {
     password,
     type,
     is_agrred_to_terms_and_policy,
+    fcm_token,
   }: {
     name: string;
     first_name: string;
@@ -342,65 +486,53 @@ export class AuthService {
     password: string;
     type?: string;
     is_agrred_to_terms_and_policy: boolean;
+    fcm_token: string;
   }) {
     try {
-      // Check if email already exist
       const userEmailExist = await UserRepository.exist({
         field: 'email',
         value: String(email),
       });
-
       if (userEmailExist) {
-        return {
-          statusCode: 401,
-          message: 'Email already exist',
-        };
+        return { statusCode: 401, message: 'Email already exist' };
       }
 
       const user = await UserRepository.createUser({
         name: first_name + ' ' + last_name,
-        first_name: first_name,
-        last_name: last_name,
-        email: email,
-        password: password,
-        type: type,
-        is_agrred_to_terms_and_policy: is_agrred_to_terms_and_policy,
+        first_name,
+        last_name,
+        email,
+        password,
+        type,
+        is_agrred_to_terms_and_policy,
       });
 
       if (user == null && user.success == false) {
-        return {
-          success: false,
-          message: 'Failed to create account',
-        };
+        return { success: false, message: 'Failed to create account' };
       }
 
-      // create stripe customer account
+      // Stripe customer
       const stripeCustomer = await StripePayment.createCustomer({
         user_id: user.data.id,
-        email: email,
-        name: name,
+        email,
+        name,
       });
 
-      if (stripeCustomer) {
-        await this.prisma.user.update({
-          where: {
-            id: user.data.id,
-          },
-          data: {
-            billing_id: stripeCustomer.id,
-          },
-        });
-      }
-
-      const userPreferences = await this.prisma.userPreferences.create({
+      // Save FCM token + billing_id together in one DB call
+      await this.prisma.user.update({
+        where: { id: user.data.id },
         data: {
-          user: {
-            connect: { id: user.data.id },
-          },
+          billing_id: stripeCustomer ? stripeCustomer.id : undefined,
+          fcm_token: fcm_token,
         },
       });
 
-      //creating jwt token
+      // Remove the old separate billing_id update — replaced above
+      // if (stripeCustomer) { await this.prisma.user.update(...) }
+
+      const userPreferences = await this.prisma.userPreferences.create({
+        data: { user: { connect: { id: user.data.id } } },
+      });
 
       const payload = {
         userPrefId: userPreferences.id,
@@ -410,76 +542,69 @@ export class AuthService {
       const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
       const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-      // store accessToken as refresh token in redis
       await this.redis.set(
         `refresh_token:${user.data.id}`,
         refreshToken,
         'EX',
-        60 * 60 * 24 * 7, // 1 hour in seconds
+        60 * 60 * 24 * 7,
       );
-      // ----------------------------------------------------
-      // // create otp code
-      // const token = await UcodeRepository.createToken({
-      //   userId: user.data.id,
-      //   isOtp: true,
-      // });
 
-      // // send otp code to email
-      // await this.mailService.sendOtpCodeToEmail({
-      //   email: email,
-      //   name: name,
-      //   otp: token,
-      // });
-
-      // return {
-      //   success: true,
-      //   message: 'We have sent an OTP code to your email',
-      // };
-
-      // ----------------------------------------------------
-
-      // Generate verification token
-      // const token = await UcodeRepository.createVerificationToken({
-      //   userId: user.data.id,
-      //   email: email,
-      // });
-
-      // Send verification email with token
-      // await this.mailService.sendVerificationLink({
-      //   email,
-      //   name: email,
-      //   token: token.token,
-      //   type: type,
-      // });
       return {
         success: true,
         message: 'Account created successfully',
-        data: {
-          accessToken: accessToken,
-          refreshToken: refreshToken,
-        },
+        data: { accessToken, refreshToken },
       };
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
   }
 
-  async updateUserPreferences(
-    userPrefId: string,
-    updateUserPreferencesDto: UserPreferencesDto,
-  ) {
+  async updateUserPreferences(userId: string, dto: UserPreferencesDto) {
     try {
-      // chcking the id
-      if (!userPrefId) {
+      if (!userId) {
         return {
           success: false,
-          message: 'id is missing',
+          message: 'User id is missing',
         };
       }
-      const requiredFields = [
+      const userPref = await this.prisma.userPreferences.findFirst({
+        where: { user_id: userId },
+      });
+
+      if (!userPref) {
+        await this.prisma.userPreferences.create({
+          data: {
+            content_preference: dto.content_preference,
+            dailyWisdomQuotes: dto.dailyWisdomQuotes,
+            guidedExercises: dto.guidedExercises,
+            meditationContent: dto.meditationContent,
+            communityDiscussions: dto.communityDiscussions,
+            journalPrompts: dto.journalPrompts,
+            scientificInsights: dto.scientificInsights,
+            focus_area: {
+              set: Array.isArray(dto.focus_area)
+                ? dto.focus_area
+                : [dto.focus_area],
+            },
+            weekly_practice: dto.weekly_practice,
+          },
+        });
+        return {
+          success: true,
+          message: 'User preferences created successfully',
+        };
+      }
+      // if (
+      //   userPref.content_preference?.length &&
+      //   userPref.dailyWisdomQuotes !== null
+      // ) {
+      //   return {
+      //     success: false,
+      //     message: 'User preferences already set',
+      //   };
+      // }
+
+      const requiredFields: (keyof UserPreferencesDto)[] = [
         'content_preference',
         'dailyWisdomQuotes',
         'guidedExercises',
@@ -490,71 +615,42 @@ export class AuthService {
         'focus_area',
         'weekly_practice',
       ];
-      const checkUserPref = await this.prisma.userPreferences.findUnique({
-        where: { id: userPrefId },
-        select: {
-          id: true,
-          content_preference: true,
-          dailyWisdomQuotes: true,
-          guidedExercises: true,
-          meditationContent: true,
-          communityDiscussions: true,
-          journalPrompts: true,
-          scientificInsights: true,
-          focus_area: true,
-          weekly_practice: true,
-        },
-      });
-      // if already has data
-      if (
-        checkUserPref.communityDiscussions &&
-        checkUserPref.content_preference
-      ) {
-        return {
-          success: false,
-          message: 'User preferences already set',
-        };
-      }
-      if (!checkUserPref) {
-        return {
-          success: false,
-          message: 'User preferences not found',
-        };
-      }
-      const importantFields = requiredFields.filter(
-        (field) =>
-          updateUserPreferencesDto[field as keyof UserPreferencesDto] ===
-            undefined ||
-          updateUserPreferencesDto[field as keyof UserPreferencesDto] === null,
-      );
-      if (importantFields.length > 0) {
-        return {
-          success: false,
-          message: `Missing required data`,
-        };
-      }
-      // update user preferences
-      await this.prisma.userPreferences.update({
-        where: { id: userPrefId },
-        data: {
-          content_preference: updateUserPreferencesDto.content_preference,
-          dailyWisdomQuotes: updateUserPreferencesDto.dailyWisdomQuotes,
-          guidedExercises: updateUserPreferencesDto.guidedExercises,
-          meditationContent: updateUserPreferencesDto.meditationContent,
-          communityDiscussions: updateUserPreferencesDto.communityDiscussions,
-          journalPrompts: updateUserPreferencesDto.journalPrompts,
-          scientificInsights: updateUserPreferencesDto.scientificInsights,
-          focus_area: updateUserPreferencesDto.focus_area,
-          weekly_practice: updateUserPreferencesDto.weekly_practice,
-        },
-      });
 
+      const missingFields = requiredFields.filter(
+        (field) => dto[field] === undefined || dto[field] === null,
+      );
+
+      if (missingFields.length > 0) {
+        return {
+          success: false,
+          message: `Missing required fields: ${missingFields.join(', ')}`,
+        };
+      }
+      await this.prisma.userPreferences.update({
+        where: { user_id: userId },
+        data: {
+          content_preference: dto.content_preference,
+          dailyWisdomQuotes: dto.dailyWisdomQuotes,
+          guidedExercises: dto.guidedExercises,
+          meditationContent: dto.meditationContent,
+          communityDiscussions: dto.communityDiscussions,
+          journalPrompts: dto.journalPrompts,
+          scientificInsights: dto.scientificInsights,
+          focus_area: {
+            set: Array.isArray(dto.focus_area)
+              ? dto.focus_area
+              : [dto.focus_area],
+          },
+          weekly_practice: dto.weekly_practice,
+        },
+      });
       return {
         success: true,
         message: 'User preferences updated successfully',
       };
     } catch (error: any) {
       console.error('Error updating user preferences:', error);
+
       return {
         success: false,
         message: 'Failed to update user preferences',
@@ -1180,4 +1276,86 @@ export class AuthService {
     }
   }
   // --------- end 2FA ---------
+
+  async googleLogin(idToken: string, fcmToken?: string) {
+    try {
+      // 1. Verify Firebase ID token
+      const decoded = await this.firebaseAuth.verifyIdToken(idToken);
+      const { email, name, uid, picture } = decoded;
+
+      if (!email) throw new UnauthorizedException('No email in token');
+
+      // 2. Find or create user
+      let user = await this.prisma.user.findUnique({ where: { email } });
+
+      if (!user) {
+        // New user — create account
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            name: name || '',
+            firebaseUid: uid,
+            avatar: picture || null,
+            type: 'user',
+            fcm_token: fcmToken || null,
+          },
+        });
+
+        // Create user preferences
+        await this.prisma.userPreferences.create({
+          data: { user: { connect: { id: user.id } } },
+        });
+
+        // Create Stripe customer
+        const stripeCustomer = await StripePayment.createCustomer({
+          user_id: user.id,
+          email,
+          name: name || email,
+        });
+        if (stripeCustomer) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { billing_id: stripeCustomer.id },
+          });
+        }
+      } else {
+        // Existing user — update firebaseUid + fcm_token
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            firebaseUid: uid,
+            fcm_token: fcmToken || user.fcm_token,
+          },
+        });
+      }
+
+      // 3. Generate JWT
+      const payload = { sub: user.id, email: user.email };
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+      // 4. Store refresh token in Redis
+      await this.redis.set(
+        `refresh_token:${user.id}`,
+        refreshToken,
+        'EX',
+        60 * 60 * 24 * 7,
+      );
+
+      // 5. Return — no password field on Google users
+      const { password, ...safeUser } = user as any;
+      return {
+        success: true,
+        message: 'Login successful',
+        user: safeUser,
+        authorization: {
+          type: 'bearer',
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        },
+      };
+    } catch (err) {
+      throw new UnauthorizedException('Invalid Firebase token');
+    }
+  }
 }
