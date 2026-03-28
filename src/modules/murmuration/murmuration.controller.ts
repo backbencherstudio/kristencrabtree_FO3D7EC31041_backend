@@ -11,6 +11,7 @@ import {
   UploadedFile,
   Req,
   UploadedFiles,
+  Query,
 } from '@nestjs/common';
 import { MurmurationService } from './murmuration.service';
 import { CreateMurmurationDto } from './dto/create-murmuration.dto';
@@ -57,8 +58,8 @@ export class MurmurationController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(@Req() req: any) {
-    return this.murmurationService.findAll(req.user.userId);
+  findAll(@Req() req: any,@Query('cursor') cursor?:string) {
+    return this.murmurationService.findAll(req.user.userId,cursor);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -92,8 +93,9 @@ export class MurmurationController {
     return this.murmurationService.addComment(user_id, id, dto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.murmurationService.remove(id);
+  @Delete('delete/:id')
+  remove(@Param('id') id: string,@Req() req:any) {
+    const userId=req.user.userId
+    return this.murmurationService.remove(id,userId);
   }
 }
