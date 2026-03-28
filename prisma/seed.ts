@@ -44,14 +44,20 @@ async function main() {
     { title: 'Comment', subject: 'Comment' },
   ];
 
-  let i = 0;
-  for (const group of permissionGroups) {
-    const scope = group.scope ?? ['read', 'create', 'update', 'show', 'delete'];
-    for (const action of scope) {
-      i++;
-      const permTitle = `${group.title}_${action}`;
-      const existing = await prisma.permission.findUnique({
-        where: { id: String(i) },
+  for (const permissionGroup of permissionGroups) {
+    const scope = permissionGroup['scope'] || [
+      'read',
+      'create',
+      'update',
+      'show',
+      'delete',
+    ];
+    for (const permission of scope) {
+      permissions.push({
+        id: String(++i),
+        title: permissionGroup.title + '_' + permission,
+        action: capitalizeFirst(permission),
+        subject: permissionGroup.subject,
       });
       if (existing) {
         console.log(`✅ Permission already exists: ${permTitle}`);
@@ -69,27 +75,19 @@ async function main() {
     }
   }
 
-  // ── Plans (DB + Stripe) ────────────────────────────────────────────────────
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+  await prisma.permission.createMany({ data: permissions });
+  console.log('✓ Permissions seeded');
 
-  const plansDisplayData = [
-    {
-      id: 'plan_free',
-      title: 'Free',
-      subtitle: 'Perfect for getting started',
-      description: 'Start the dig—no pressure, just curiosity.',
-      price: '0.00',
-      price_in_cents: 0,
-      tag: 'free',
-      interval: null,
-      features: [
-        'Limited journaling entries',
-        'Daily quotes and inspiration',
-        'Three question/exercise per week',
-        'Read-only community access',
-        'Basic progress tracking',
-        'Ad-supported experience',
-      ],
+  // Seed user
+  console.log('Seeding user...');
+  const hashedPassword = await bcrypt.hash('12345678', 10);
+
+  const systemUser = await prisma.user.create({
+    data: {
+      username: 'admin',
+      email: 'admin@gmail.com',
+      password: hashedPassword,
+      type: 'admin',
     },
     {
       id: 'plan_monthly',
@@ -242,58 +240,24 @@ async function main() {
       }
     }
 
-    // 3. Save plan to DB
-    await prisma.plans.create({
-      data: {
-        id: plan.id,
-        title: plan.title,
-        subtitle: plan.subtitle,
-        description: plan.description,
-        price: plan.price,
-        tag: plan.tag,
-        features: plan.features,
-        stripe_product_id,
-        stripe_price_id,
-      },
-    });
+  const normalUser = await prisma.user.upsert({
+  where: { email: 'user@gmail.com' },
+  update: {},
+  create: {
+    username: 'user',
+    email: 'user@gmail.com',
+    password: hashedPassword,
+    type: 'user',
+  },
+});
 
-    console.log(`🚀 Plan created in DB: ${plan.title}`);
-  }
+console.log('✓ Normal user created:', normalUser.id);
 
-  // ── Access for subscription ────────────────────────────────────────────────
-  const accessPlans = [
-    {
-      id: 'access_free',
-      subscriptionName: 'free',
-      journal_entries: 2,
-      quotesPerday: 1,
-      digsPerWeek: 3,
-      murmurationLimit: false,
-      audioPostJournal: false,
-      meditationAccess: false,
-      adService: true,
-    },
-    {
-      id: 'access_monthly',
-      subscriptionName: 'monthly', // ← must match plan title lowercase
-      journal_entries: null, // null = unlimited
-      quotesPerday: null,
-      digsPerWeek: null,
-      murmurationLimit: true,
-      audioPostJournal: true,
-      meditationAccess: true,
-      adService: false,
-    },
-    {
-      id: 'access_yearly',
-      subscriptionName: 'yearly',
-      journal_entries: null,
-      quotesPerday: null,
-      digsPerWeek: null,
-      murmurationLimit: true,
-      audioPostJournal: true,
-      meditationAccess: true,
-      adService: false,
+  // Assign role to user
+  await prisma.roleUser.create({
+    data: {
+      user_id: systemUser.id,
+      role_id: '1',
     },
   ];
 
@@ -347,29 +311,17 @@ async function main() {
     console.log(`🚀 Normal user created: ${normalUser.id}`);
   }
 
-  // ── Role assignment ────────────────────────────────────────────────────────
-  const existingRoleUser = await prisma.roleUser.findFirst({
-    where: { user_id: systemUser.id, role_id: '1' },
-  });
-  if (existingRoleUser) {
-    console.log(`✅ Role already assigned to admin user`);
-  } else {
-    await prisma.roleUser.create({
-      data: { user_id: systemUser.id, role_id: '1' },
-    });
-    console.log(`🚀 Role assigned to admin user`);
-  }
-
-  // ── Permission-role relationships ──────────────────────────────────────────
-  const allPermissions = await prisma.permission.findMany();
-
-  // Super admin — system_tenant_management permissions
-  const suAdminPerms = allPermissions.filter((p) =>
-    p.title.startsWith('system_tenant_management_'),
+  // Super admin permissions
+  const su_admin_permissions = all_permissions.filter(
+    (p) => p.title.substring(0, 25) === 'system_tenant_management_',
   );
-  for (const perm of suAdminPerms) {
-    const existing = await prisma.permissionRole.findFirst({
-      where: { role_id: '1', permission_id: perm.id },
+
+  if (su_admin_permissions.length > 0) {
+    await prisma.permissionRole.createMany({
+      data: su_admin_permissions.map((p) => ({
+        role_id: '1',
+        permission_id: p.id,
+      })),
     });
     if (existing) {
       console.log(
@@ -383,13 +335,17 @@ async function main() {
     }
   }
 
-  // Admin — all other permissions
-  const adminPerms = allPermissions.filter(
-    (p) => !p.title.startsWith('system_tenant_management_'),
+  // Admin permissions
+  const project_admin_permissions = all_permissions.filter(
+    (p) => p.title.substring(0, 25) !== 'system_tenant_management_',
   );
-  for (const perm of adminPerms) {
-    const existing = await prisma.permissionRole.findFirst({
-      where: { role_id: '2', permission_id: perm.id },
+
+  if (project_admin_permissions.length > 0) {
+    await prisma.permissionRole.createMany({
+      data: project_admin_permissions.map((p) => ({
+        role_id: '2',
+        permission_id: p.id,
+      })),
     });
     if (existing) {
       console.log(`✅ Permission-role already exists: admin → ${perm.title}`);
