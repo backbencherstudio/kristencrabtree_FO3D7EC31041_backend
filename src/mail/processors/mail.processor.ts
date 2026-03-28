@@ -2,6 +2,7 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import appConfig from 'src/config/app.config';
 
 @Processor('mail-queue5')
 export class MailProcessor extends WorkerHost {
@@ -39,13 +40,12 @@ export class MailProcessor extends WorkerHost {
         case 'sendOtpCodeToEmail':
           this.logger.log('Sending OTP code to email');
           console.log('Mail Config:', {
-            host: process.env.MAIL_HOST || 'smtp.gmail.com',
-            port: process.env.MAIL_PORT || 587,
-            user: process.env.MAIL_USERNAME,
-            password: process.env.MAIL_PASSWORD,
-            from: process.env.MAIL_FROM_ADDRESS,
+            host: appConfig().mail.host || 'smtp.gmail.com',
+            port: appConfig().mail.port || 587,
+            user: appConfig().mail.user,
+            password: appConfig().mail.password,
+            from: appConfig().mail.from,
           }),
-
             await this.mailerService.sendMail({
               to: job.data.to,
               from: job.data.from,

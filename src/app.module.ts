@@ -23,6 +23,8 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { JournelsModule } from './modules/journels/journels.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { MurmurationModule } from './modules/murmuration/murmuration.module';
+import { DigsModule } from './modules/digs/digs.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -30,6 +32,7 @@ import { MurmurationModule } from './modules/murmuration/murmuration.module';
       isGlobal: true,
       load: [appConfig],
     }),
+    ScheduleModule.forRoot(),
     BullModule.forRoot({
       connection: {
         host: appConfig().redis.host,
@@ -80,6 +83,8 @@ import { MurmurationModule } from './modules/murmuration/murmuration.module';
     JournelsModule,
     QuotesModule,
     MurmurationModule,
+    DigsModule,
+    // SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [
