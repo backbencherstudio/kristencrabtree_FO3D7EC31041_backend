@@ -50,17 +50,23 @@ export default () => ({
   mail: {
     host: process.env.MAIL_HOST || 'smtp.gmail.com',
     port: process.env.MAIL_PORT || 587,
-    user: process.env.MAIL_USERNAME || 'tqmhosain@gmail.com',
-    password: process.env.MAIL_PASSWORD || 'wthjazhnwpqdrsvf',
-    from: process.env.MAIL_FROM_ADDRESS || 'tqmhosain@gmail.com',
+    user: process.env.MAIL_USERNAME,
+    password: process.env.MAIL_PASSWORD,
+    from: process.env.MAIL_FROM_ADDRESS,
   },
-
 
   auth: {
     google: {
       app_id: process.env.GOOGLE_APP_ID,
       app_secret: process.env.GOOGLE_APP_SECRET,
       callback: process.env.GOOGLE_CALLBACK_URL,
+    },
+    apple: {
+      client_id: process.env.APPLE_CLIENT_ID,
+      team_id: process.env.APPLE_TEAM_ID,
+      key_id: process.env.APPLE_KEY_ID,
+      private_key: process.env.APPLE_PRIVATE_KEY,
+      redirect_url: process.env.APPLE_REDIRECT_URL,
     },
   },
 

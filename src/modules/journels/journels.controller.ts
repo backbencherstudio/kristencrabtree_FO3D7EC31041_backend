@@ -10,12 +10,14 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { JournelsService } from './journels.service';
 import { CreateJournelDto } from './dto/create-journel.dto';
 import { UpdateJournelDto } from './dto/update-journel.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Controller('journels')
 export class JournelsController {
@@ -29,33 +31,28 @@ export class JournelsController {
     @Body() createJournelDto: CreateJournelDto,
     @Req() req: any,
   ) {
-    try {
-      const user_id = req.user?.userId;
-      return this.journelsService.create(user_id, createJournelDto, audio);
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to create journel',
-        error: error.message || error,
-      };
-    }
+    const user_id = req.user?.userId;
+    console.log(req.file)
+    return this.journelsService.create(user_id, createJournelDto, audio);
   }
   @UseGuards(JwtAuthGuard)
   @Get('all')
-  findAll(@Req() req:any) {
-    return this.journelsService.findAll(req.user.userId);
+  findAll(@Req() req: any, @Query() paginationDto: PaginationDto) {
+    const userId = req.user?.userId;
+    return this.journelsService.findAll(userId, paginationDto);
   }
   @UseGuards(JwtAuthGuard)
-  @Get('reccommended')
+  @Get('recommended')
   getRecommendedJournals(@Req() req: any) {
     const user_id = req.user?.userId;
     return this.journelsService.getRecommendedJournals(user_id);
   }
+
   @UseGuards(JwtAuthGuard)
   @Get('my-journals')
-  getMyJournals(@Req() req: any) {
+  getMyJournals(@Req() req: any, @Query('searchTerm') searchTerm?: string) {
     const user_id = req.user?.userId;
-    return this.journelsService.getPersonalJournals(user_id);
+    return this.journelsService.getPersonalJournals(user_id, searchTerm);
   }
   @UseGuards(JwtAuthGuard)
   @Get(':id')

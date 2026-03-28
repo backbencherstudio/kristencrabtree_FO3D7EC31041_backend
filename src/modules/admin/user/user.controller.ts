@@ -17,6 +17,8 @@ import { Role } from '../../../common/guard/role/role.enum';
 import { Roles } from '../../../common/guard/role/roles.decorator';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { userActionDto } from './dto/user-action.dto';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @ApiBearerAuth()
 @ApiTags('User')
@@ -42,15 +44,14 @@ export class UserController {
 
   @ApiResponse({ description: 'Get all users' })
   @Get()
-  async findAll(
-    @Query() query: { q?: string; type?: string; approved?: string },
-  ) {
+  async findAll(@Query() query: { status?: string; approved?: string, joined?:string; plan?:string}, @Query() paginationDto: PaginationDto) {
     try {
-      const q = query.q;
-      const type = query.type;
+      const plan= query.plan;
+      const status = query.status;
       const approved = query.approved;
+      const joined= query.joined
 
-      const users = await this.userService.findAll({ q, type, approved });
+      const users = await this.userService.findAll({ plan, status, approved, joined, paginationDto });
       return users;
     } catch (error) {
       return {
@@ -130,5 +131,10 @@ export class UserController {
         message: error.message,
       };
     }
+  }
+  
+  @Patch('action/:id')
+  async userAction(@Param('id') id:string,@Body() actionDto:userActionDto){
+    return await this.userService.userAction(id,actionDto)
   }
 }

@@ -9,11 +9,13 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { DigsService } from './digs.service';
 import { CreateDigDto, SaveResponseDto } from './dto/create-dig.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
-import { User } from '../user/entities/user.entity';
+import { UpdateDigDto } from './dto/update-dig.dto';
+import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Controller('admin/digs')
 export class DigsController {
@@ -21,21 +23,21 @@ export class DigsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() createDigDto: CreateDigDto, @Req() req: any) {
+  async create(@Body() createDigDto: CreateDigDto, @Req() req: any) {
     const userId = req.user?.userId;
     return this.digsService.create(userId, createDigDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('points')
-  getPoints(@Req() req: any) {
+  async getPoints(@Req() req: any) {
     const userId = req.user?.userId;
     return this.digsService.getPointsdict(userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('response/:digId')
-  respondToDig(
+  async respondToDig(
     @Param('digId') digId: string,
     @Req() req: any,
     @Body() body: SaveResponseDto,
@@ -49,16 +51,34 @@ export class DigsController {
     return this.digsService.saveUserResponses(userId, digId, body.answers);
   }
 
-
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req: any) {
+  async findOne(@Param('id') id: string, @Req() req: any) {
     return this.digsService.getSingleDig(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(@Req() req: any) {
+  async findAll(@Req() req: any, @Query() paginationDto: PaginationDto) {
     const userId = req.user?.userId;
-    return this.digsService.getAlldigs(userId);
+    return this.digsService.getAlldigs(userId, paginationDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('update/:id')
+  async updateDig(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() updateDig: UpdateDigDto,
+  ) {
+    const userId = req.user.userId;
+    return await this.digsService.updateDig(id, userId, updateDig);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('delete/:id')
+  async deleteDig(@Param('id') id: string, @Req() req: any) {
+    const userId = req.user.userId;
+    return await this.digsService.deleteDig(id, userId);
   }
 }

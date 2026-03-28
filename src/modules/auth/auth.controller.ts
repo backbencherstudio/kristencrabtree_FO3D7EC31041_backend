@@ -23,6 +23,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { GoogleLoginDto } from './dto/google-login.dto';
+import { AppleAuthGuard } from './guards/apple.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -59,35 +61,11 @@ export class AuthController {
       const password = data.password;
       const type = data.type;
       const is_agrred_to_terms_and_policy = data.is_agrred_to_terms_and_policy;
+      const fcm_token = data.fcm_token;
 
       if (is_agrred_to_terms_and_policy == false) {
         throw new HttpException(
           'You must agree to the terms and policy',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-
-      // if (!name) {
-      //   throw new HttpException('Name not provided', HttpStatus.UNAUTHORIZED);
-      // }
-      if (!first_name) {
-        throw new HttpException(
-          'First name not provided',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-      if (!last_name) {
-        throw new HttpException(
-          'Last name not provided',
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-      if (!email) {
-        throw new HttpException('Email not provided', HttpStatus.UNAUTHORIZED);
-      }
-      if (!password) {
-        throw new HttpException(
-          'Password not provided',
           HttpStatus.UNAUTHORIZED,
         );
       }
@@ -100,6 +78,7 @@ export class AuthController {
         password: password,
         type: type,
         is_agrred_to_terms_and_policy: is_agrred_to_terms_and_policy,
+        fcm_token,
       });
 
       return response;
@@ -117,7 +96,7 @@ export class AuthController {
   @Post('userPreff')
   async updateUserPreff(@Req() req: Request, @Body() body: any) {
     try {
-      const preffId = req.user.userPrefId;
+      const preffId = req.user.userId;
       return this.authService.updateUserPreferences(preffId, body);
     } catch (error) {}
   }
@@ -126,30 +105,30 @@ export class AuthController {
   @ApiOperation({ summary: 'Login user' })
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Req() req: Request, @Res() res: Response) {
+  async login(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Body('fcm_token') fcmToken: string,
+  ) {
     try {
       const user_id = req.user.id;
-
       const user_email = req.user.email;
 
       const response = await this.authService.login({
         userId: user_id,
         email: user_email,
+        fcmToken,
       });
 
-      // store to secure cookies
       res.cookie('refresh_token', response.authorization.refresh_token, {
         httpOnly: true,
         secure: true,
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 60 * 24 * 7,
       });
 
       res.json(response);
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+      return { success: false, message: error.message };
     }
   }
 
@@ -194,19 +173,17 @@ export class AuthController {
     }
   }
 
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleLogin(): Promise<any> {
-    return HttpStatus.OK;
+  @Post('google')
+  async googleFirebaseLogin(@Body() dto: GoogleLoginDto) {
+    return this.authService.googleLogin(dto.token, dto.fcm_token);
   }
 
-  @Get('google/redirect')
-  @UseGuards(AuthGuard('google'))
-  async googleLoginRedirect(@Req() req: Request): Promise<any> {
-    return {
-      statusCode: HttpStatus.OK,
-      data: req.user,
-    };
+  @Post('apple')
+  async appleLogin(
+    @Body('idToken') idToken: string,
+    @Body('fcm_token') fcmToken?: string,
+  ) {
+    return this.authService.appleLogin(idToken, fcmToken);
   }
 
   // update user
@@ -216,17 +193,6 @@ export class AuthController {
   @Patch('update')
   @UseInterceptors(
     FileInterceptor('image', {
-      // storage: diskStorage({
-      //   destination:
-      //     appConfig().storageUrl.rootUrl + appConfig().storageUrl.avatar,
-      //   filename: (req, file, cb) => {
-      //     const randomName = Array(32)
-      //       .fill(null)
-      //       .map(() => Math.round(Math.random() * 16).toString(16))
-      //       .join('');
-      //     return cb(null, `${randomName}${file.originalname}`);
-      //   },
-      // }),
       storage: memoryStorage(),
     }),
   )
