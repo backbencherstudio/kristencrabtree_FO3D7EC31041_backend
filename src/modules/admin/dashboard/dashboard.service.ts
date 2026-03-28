@@ -217,65 +217,91 @@ export class DashboardService {
   async paymentOverview(
     paginationDto: { page?: number; perPage?: number },
     filters: { planName?: string; status?: string },
-  ) {
-    const whereClause: any = {};
+  ): Promise<{
+    success: boolean;
+    data: any[];
+    pagination: { total: number; totalPages: number; currentPage: number };
+  }> {
+    try {
+      // Build where clause safely
+      const whereClause: any = {};
 
-    if (filters.planName) {
-      whereClause.planName = {
-        equals: filters.planName,
-        mode: 'insensitive',
-      };
-    }
+      // if (filters.planName?.trim()) {
+      //   whereClause.planName = {
+      //     equals: filters.planName.trim(),
+      //     mode: 'insensitive',
+      //   };
+      // }
 
-    if (filters.status) {
-      whereClause.status = {
-        equals: filters.status,
-        mode: 'insensitive',
-      };
-    }
+      // if (filters.status?.trim()) {
+      //   whereClause.status = {
+      //     equals: filters.status.trim(),
+      //     mode: 'insensitive',
+      //   };
+      // }
 
-    const page =
-      Number(paginationDto?.page) > 0 ? Number(paginationDto.page) : 1;
-    const limit =
-      Number(paginationDto?.perPage) > 0 ? Number(paginationDto.perPage) : 10;
+      // Pagination
+      const page =
+        Number(paginationDto?.page) > 0 ? Number(paginationDto.page) : 1;
+      const limit =
+        Number(paginationDto?.perPage) > 0 ? Number(paginationDto.perPage) : 10;
+      const skip = (page - 1) * limit;
 
-    const skip = (page - 1) * limit;
-
-    const [total, subscriptions] = await this.prisma.$transaction([
-      this.prisma.userSubscription.count({
+      // Fetch total count
+      const total = await this.prisma.userSubscription.count({
         where: whereClause,
-      }),
-      this.prisma.userSubscription.findMany({
-        select: {
-          planName: true,
-          status: true,
-          updated_at: true,
-          cardLast4: true,
+      });
+
+      // Fetch paginated subscriptions with user data
+      const subscriptions = await this.prisma.userSubscription.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { updated_at: 'desc' },
+        include: {
           user: {
             select: {
               email: true,
               first_name: true,
+              last_name: true,
+              avatar: true, // assuming avatar exists
             },
           },
         },
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: {
-          updated_at: 'desc',
-        },
-      }),
-    ]);
+      });
 
-    return {
-      success: true,
-      data: subscriptions,
-      pagination: {
-        total,
-        totalPages: Math.ceil(total / limit),
-        currentPage: page,
-      },
-    };
+      // Format subscriptions safely
+      const formattedSubscriptions = subscriptions.map((sub) => ({
+        planName: sub.planName ?? null,
+        status: sub.status ?? null,
+        updated_at: sub.updated_at,
+        cardLast4: sub.cardLast4 ?? null,
+        user: {
+          email: sub.user?.email ?? null,
+          name: sub.user
+            ? `${sub.user.first_name ?? ''} ${sub.user.last_name ?? ''}`.trim()
+            : null,
+          userAvatar: sub.user?.avatar ?? null,
+        },
+      }));
+
+      return {
+        success: true,
+        data: formattedSubscriptions,
+        pagination: {
+          total,
+          totalPages: Math.ceil(total / limit),
+          currentPage: page,
+        },
+      };
+    } catch (err) {
+      console.error('paymentOverview error:', err);
+      return {
+        success: false,
+        data: [],
+        pagination: { total: 0, totalPages: 0, currentPage: 1 },
+      };
+    }
   }
 
   async paymentStats() {
@@ -338,42 +364,39 @@ export class DashboardService {
     }
 
     const digs = await this.prisma.digs.findMany({
-      orderBy:{
-        answeredCount:'desc'
+      orderBy: {
+        answeredCount: 'desc',
       },
-      take:5
-    })
-    
+      take: 5,
+    });
 
     return {
       success: true,
       data: {
         total: {
-          text:"Total Reveneau",
+          text: 'Total Reveneau',
           value: totalRevenue.toString(),
         },
         yearly: {
-          text: "Yearly Revenue",
+          text: 'Yearly Revenue',
           value: yearlyRevenue.toString(),
         },
         monthly: {
-          text: "Monthly Revenue",
+          text: 'Monthly Revenue',
           value: monthlyRevenue.toString(),
         },
-        topDigs:{
-          text:"Top Active Exercises",
-          digs:digs.map(dig=>({
-          id:dig.id,
-          title:dig.title,
-          type:dig.type
-        }))
-        }
+        topDigs: {
+          text: 'Top Active Exercises',
+          digs: digs.map((dig) => ({
+            id: dig.id,
+            title: dig.title,
+            type: dig.type,
+          })),
+        },
       },
     };
   }
-  async topdigs(){
-    
-  }
+  async topdigs() {}
   findOne(id: number) {
     return `This action returns a #${id} dashboard`;
   }

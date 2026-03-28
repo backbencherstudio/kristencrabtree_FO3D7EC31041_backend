@@ -483,31 +483,52 @@ export class DigsService {
     }
   }
 
-  async deleteDig(id, userId) {
+  async deleteDig(id: string, userId: string) {
     const user = await this.prisma.user.findFirst({
       where: {
         id: userId,
         type: 'admin',
       },
     });
+
     if (!user) {
       throw new NotFoundException('Admin user not found');
     }
 
-    const dig = await this.prisma.digs.findFirst({
-      where: {
-        id: id,
-      },
+    const dig = await this.prisma.digs.findUnique({
+      where: { id },
     });
-    if (!dig) throw new NotFoundException('Dig not found');
-    await this.prisma.digs.delete({
-      where: {
-        id: id,
-      },
+
+    if (!dig) {
+      throw new NotFoundException('Dig not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1️⃣ Delete all responses of this dig
+      await tx.digResponse.deleteMany({
+        where: { dig_id: id },
+      });
+
+      // 2️⃣ If you have layers/questions table linked to dig, delete them too
+      // (Uncomment if exists in your schema)
+
+      // await tx.digLayer.deleteMany({
+      //   where: { dig_id: id },
+      // });
+
+      // await tx.digQuestion.deleteMany({
+      //   where: { dig_id: id },
+      // });
+
+      // 3️⃣ Finally delete the dig itself
+      await tx.digs.delete({
+        where: { id },
+      });
     });
+
     return {
       success: true,
-      message: 'Digs deleted successfully',
+      message: 'Dig and all related data deleted permanently',
     };
   }
 }

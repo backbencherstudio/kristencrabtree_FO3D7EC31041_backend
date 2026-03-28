@@ -24,7 +24,6 @@ export class DigsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() createDigDto: CreateDigDto, @Req() req: any) {
-    console.log(createDigDto);
     const userId = req.user?.userId;
     return this.digsService.create(userId, createDigDto);
   }
