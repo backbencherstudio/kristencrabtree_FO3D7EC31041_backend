@@ -1,9 +1,31 @@
 import { PrismaClient } from '@prisma/client';
 
+// ── Return Types ──────────────────────────────────────────────
+export interface SubscriptionError {
+  success: false;
+  message: string;
+}
+
+export interface SubscriptionData {
+  success: true;
+  subscriptionName: string;
+  journal_entries: number;
+  quotesPerday: number;
+  digsPerWeek: number;
+  murmurationPostLimit: boolean;
+  audioPostJournal: boolean;
+  meditationAccess: boolean;
+  adService: boolean;
+  focus_area?: any;
+  [key: string]: any;
+}
+
+export type SubscriptionResult = SubscriptionError | SubscriptionData;
+
 export async function SubscriptionManager(
   prisma: PrismaClient,
   userId: string,
-) {
+): Promise<SubscriptionResult> {
   const userSubscription = await prisma.userSubscription.findUnique({
     where: { userId },
     select: { accessId: true },
@@ -70,5 +92,6 @@ export async function SubscriptionManager(
     success: true,
     ...userPreferences,
     ...allowedPermission,
+    murmurationPostLimit: allowedPermission.murmurationLimit,
   };
 }

@@ -14,6 +14,7 @@ import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 @Injectable()
 export class MurmurationService {
   constructor(private prisma: PrismaService) {}
+
   async create(
     user_id: string,
     dto: CreateMurmurationDto,
@@ -33,8 +34,17 @@ export class MurmurationService {
         return { success: false, message: 'User not found' };
       }
 
+      // ── Subscription guard ─────────────────────────────────────────────
       const userPlan = await SubscriptionManager(this.prisma, user.id);
 
+      if (!userPlan || !userPlan.success) {
+        return {
+          success: false,
+          message: userPlan?.message ?? 'Subscription check failed.',
+        };
+      }
+
+      // TypeScript now knows userPlan is SubscriptionData ✅
       if (userPlan.subscriptionName === 'free') {
         return {
           success: false,
@@ -73,6 +83,7 @@ export class MurmurationService {
               message: 'Audio is not allowed for text type',
             };
           }
+
           if (image) {
             return {
               success: false,
@@ -128,10 +139,11 @@ export class MurmurationService {
               message: 'Image file is required for image type',
             };
           }
+
           if (dto.text) {
             return {
               success: false,
-              message: 'Text is not allowed for audio type',
+              message: 'Text is not allowed for image type',
             };
           }
 
@@ -145,7 +157,7 @@ export class MurmurationService {
           if (!dto.title) {
             return {
               success: false,
-              message: 'Title is required for audio type',
+              message: 'Title is required for image type',
             };
           }
 
@@ -440,20 +452,20 @@ export class MurmurationService {
         comments: true,
       },
     });
+
     if (!ifDeleted) {
       return {
         success: false,
         message:
-          'murmuration was not found or you do not have proper access to delete it',
+          'Murmuration was not found or you do not have proper access to delete it',
       };
     }
+
     return {
       success: true,
-      message: 'Murmuration deleted Successfully',
+      message: 'Murmuration deleted successfully',
     };
   }
-
-  //comments , reply , like and share
 
   async addComment(
     user_id: string,
@@ -474,6 +486,7 @@ export class MurmurationService {
       if (!murmuration) {
         return { success: false, message: 'Murmuration not found' };
       }
+
       const comment = await this.prisma.comments.create({
         data: {
           user_id,
@@ -491,11 +504,12 @@ export class MurmurationService {
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to fetch murmurations',
+        message: 'Failed to add comment',
         error: error.message || error,
       };
     }
   }
+
   async getCommentsForMurmuration(murmurationId: string) {
     try {
       const comments = await this.prisma.comments.findMany({
@@ -513,6 +527,7 @@ export class MurmurationService {
       console.log(error);
     }
   }
+
   async toggleLikeForMurmuration(userId: string, murmurationId: string) {
     try {
       await this.prisma.murmurationLike.create({
@@ -541,6 +556,7 @@ export class MurmurationService {
       };
     }
   }
+
   async toggleLikeForComment(userId: string, commentId: string) {
     try {
       await this.prisma.commentLike.create({
@@ -569,5 +585,6 @@ export class MurmurationService {
       };
     }
   }
+
   async shareMurmuration() {}
-  }
+}

@@ -10,13 +10,12 @@ import { validate } from 'class-validator';
 import Redis from 'ioredis';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { SubscriptionManager } from 'src/common/helper/subscription.manager';
-import { getLastNDaysRange } from '../dashboard/helper.utils';
 import { getLevelFromTotalXp } from 'src/modules/auth/helper';
 
 function getWeekBoundaries(date: Date = new Date()) {
   const current = new Date(date);
   const day = current.getDay();
-  const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
+  const diff = current.getDate() - day + (day === 0 ? -6 : 1);
 
   const weekStart = new Date(current.setDate(diff));
   weekStart.setHours(0, 0, 0, 0);
@@ -27,6 +26,7 @@ function getWeekBoundaries(date: Date = new Date()) {
 
   return { weekStart, weekEnd };
 }
+
 @Injectable()
 export class DigsService {
   constructor(
@@ -65,7 +65,6 @@ export class DigsService {
               other_text: layer.other_text,
               text: layer.text,
               user_id: userid,
-              // only save correct_answer for Question and Experience layers
               correct_answer:
                 layer.question_name === 'The_Question' ||
                 layer.question_name === 'The_Experience'
@@ -99,7 +98,7 @@ export class DigsService {
       where: { id: digId },
       include: {
         layers: {
-          where: { deleted_at: null }, // ← only active layers, matches your schema
+          where: { deleted_at: null },
           select: { id: true },
         },
       },
@@ -130,7 +129,6 @@ export class DigsService {
       };
     }
 
-    // Block re-submitting already answered layers
     const duplicateLayers = layerIds.filter((id) =>
       alreadyAnsweredLayerIds.includes(id),
     );
@@ -141,12 +139,11 @@ export class DigsService {
       };
     }
 
-    // Validate submitted layers belong to this dig and are active (deleted_at: null)
     const layers = await this.prisma.layers.findMany({
       where: {
         id: { in: layerIds },
         dig_id: digId,
-        deleted_at: null, // ← matches your schema
+        deleted_at: null,
       },
       select: {
         id: true,
@@ -167,7 +164,6 @@ export class DigsService {
 
     const layerMap = new Map(layers.map((l) => [l.id, l]));
 
-    // Validate responses
     for (const response of createdResponses) {
       const layer = layerMap.get(response.layer_id);
       if (!layer)
@@ -222,7 +218,6 @@ export class DigsService {
       }
     }
 
-    // Save responses
     const savedResponses = await this.prisma.$transaction(
       createdResponses.map((r) =>
         this.prisma.digResponse.create({
@@ -236,15 +231,22 @@ export class DigsService {
       ),
     );
 
-    // Compute points from already-fetched layers (no extra query needed)
     const totalPoints = layers.reduce((sum, l) => sum + (l.point ?? 0), 0);
-
-    // Check completion
     const newTotalCompleted = completedLayers + savedResponses.length;
     const isDigCompleted = newTotalCompleted >= totalLayers;
 
     if (isDigCompleted) {
+      // ── Subscription guard — fixes TS error ────────────────────────────
       const userPlan = await SubscriptionManager(this.prisma, userId);
+
+      if (!userPlan || !userPlan.success) {
+        return {
+          success: false,
+          message: userPlan?.message ?? 'Subscription check failed.',
+        };
+      }
+
+      // TypeScript now knows userPlan is SubscriptionData ✅
       const isFreeUser = userPlan.subscriptionName === 'free';
 
       if (isFreeUser) {
@@ -349,13 +351,10 @@ export class DigsService {
       const digs = await this.prisma.digs.findMany({
         skip,
         take: perPage,
-        orderBy: {
-          created_at: 'desc',
-        },
-        include: {
-          layers: true,
-        },
+        orderBy: { created_at: 'desc' },
+        include: { layers: true },
       });
+
       const digsWithStatus = digs.map((dig) => ({
         ...dig,
         is_completed: answeredDigIds.has(dig.id),
@@ -426,8 +425,6 @@ export class DigsService {
         return { success: false, message: 'Dig not found' };
       }
 
-      // Soft-delete existing layers instead of hard deleteMany,
-      // so DigResponse foreign keys are preserved in user history.
       const existingLayerIds = existing.layers.map((l) => l.id);
       if (existingLayerIds.length > 0) {
         await this.prisma.layers.updateMany({
@@ -436,7 +433,6 @@ export class DigsService {
         });
       }
 
-      // Create new layers fresh
       const updated = await this.prisma.digs.update({
         where: { id },
         data: {
@@ -462,7 +458,6 @@ export class DigsService {
           },
         },
         include: {
-          // Only return active (non-deleted) layers in the response
           layers: {
             where: { deleted_at: null },
           },
@@ -485,10 +480,7 @@ export class DigsService {
 
   async deleteDig(id: string, userId: string) {
     const user = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        type: 'admin',
-      },
+      where: { id: userId, type: 'admin' },
     });
 
     if (!user) {
@@ -504,23 +496,10 @@ export class DigsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // 1️⃣ Delete all responses of this dig
       await tx.digResponse.deleteMany({
         where: { dig_id: id },
       });
 
-      // 2️⃣ If you have layers/questions table linked to dig, delete them too
-      // (Uncomment if exists in your schema)
-
-      // await tx.digLayer.deleteMany({
-      //   where: { dig_id: id },
-      // });
-
-      // await tx.digQuestion.deleteMany({
-      //   where: { dig_id: id },
-      // });
-
-      // 3️⃣ Finally delete the dig itself
       await tx.digs.delete({
         where: { id },
       });

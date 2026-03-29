@@ -3,12 +3,12 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import appConfig from 'src/config/app.config';
 
-// Helper function to get week boundaries
 function getWeekBoundaries(date: Date = new Date()) {
   const current = new Date(date);
   const day = current.getDay();
-  const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
+  const diff = current.getDate() - day + (day === 0 ? -6 : 1);
 
   const weekStart = new Date(current.setDate(diff));
   weekStart.setHours(0, 0, 0, 0);
@@ -20,7 +20,6 @@ function getWeekBoundaries(date: Date = new Date()) {
   return { weekStart, weekEnd };
 }
 
-// In your service class
 @Injectable()
 export class DigsService {
   constructor(
@@ -43,15 +42,24 @@ export class DigsService {
         return await this.searchDigs(search.trim());
       }
 
-      const isProductionMode = process.env.PRODUCTION_MODE === 'true';
+      const isProductionMode = appConfig().app.production_mode === 'true';
 
       if (!isProductionMode) {
         return await this.generateRandomDig(userId);
       }
 
+      // ── Subscription guard ────────────────────────────────────
       const userPlan = await SubscriptionManager(this.prisma, userId);
 
-      if (userPlan.focus_area.length === 0) {
+      if (!userPlan || !userPlan.success) {
+        return {
+          success: false,
+          message: userPlan?.message ?? 'Subscription check failed.',
+        };
+      }
+
+      // TypeScript now knows userPlan is SubscriptionData ✅
+      if (!userPlan.focus_area || userPlan.focus_area.length === 0) {
         return { success: false, message: 'User has no saved preferences' };
       }
 
@@ -103,7 +111,6 @@ export class DigsService {
     weekStart: Date,
     weekEnd: Date,
   ) {
-    // Check cache first
     const cacheKey = `digs:weekly:${userId}:${weekStart.getTime()}`;
     const cachedDigs = await this.redis.get(cacheKey);
 
@@ -116,23 +123,16 @@ export class DigsService {
       };
     }
 
-    // Check if user has weekly digs assigned
     const weeklyDigs = await this.prisma.userWeeklyDig.findMany({
-      where: {
-        userId,
-        weekStart,
-      },
+      where: { userId, weekStart },
       include: {
         dig: {
-          include: {
-            layers: true,
-          },
+          include: { layers: true },
         },
       },
       orderBy: { position: 'asc' },
     });
 
-    // Check if all 3 digs are completed
     const allCompleted =
       weeklyDigs.length === 3 && weeklyDigs.every((d) => d.completed);
 
@@ -151,7 +151,6 @@ export class DigsService {
       };
     }
 
-    // If we have existing digs for this week, return them
     if (weeklyDigs.length > 0) {
       const digsData = {
         digs: weeklyDigs.map((wd) => ({
@@ -163,7 +162,6 @@ export class DigsService {
         completedCount: weeklyDigs.filter((d) => d.completed).length,
       };
 
-      // Cache until end of week
       const secondsUntilWeekEnd = Math.floor(
         (weekEnd.getTime() - Date.now()) / 1000,
       );
@@ -181,20 +179,13 @@ export class DigsService {
       };
     }
 
-    // Generate new weekly digs (first time this week)
     const availableDigs = await this.prisma.digs.findMany({
       where: {
-        type: {
-          hasSome: userPlan.focus_area,
-        },
+        type: { hasSome: userPlan.focus_area },
       },
-      orderBy: {
-        created_at: 'desc',
-      },
-      include: {
-        layers: true,
-      },
-      take: 50, // Get a pool to randomize from
+      orderBy: { created_at: 'desc' },
+      include: { layers: true },
+      take: 50,
     });
 
     if (availableDigs.length < 3) {
@@ -204,11 +195,9 @@ export class DigsService {
       };
     }
 
-    // Randomly select 3 digs
     const shuffled = availableDigs.sort(() => 0.5 - Math.random());
     const selectedDigs = shuffled.slice(0, 3);
 
-    // Create UserWeeklyDig records
     await this.prisma.$transaction(
       selectedDigs.map((dig, index) =>
         this.prisma.userWeeklyDig.create({
@@ -233,7 +222,6 @@ export class DigsService {
       completedCount: 0,
     };
 
-    // Cache until end of week
     const secondsUntilWeekEnd = Math.floor(
       (weekEnd.getTime() - Date.now()) / 1000,
     );
@@ -252,23 +240,14 @@ export class DigsService {
   }
 
   private async handlePaidUserDigs(userId: string, userPlan: any) {
-    // Check if there are ANY incomplete digs from ANY previous day
     const incompleteDigs = await this.prisma.userDailyDig.findMany({
-      where: {
-        userId,
-        completed: false,
-      },
+      where: { userId, completed: false },
       include: {
-        dig: {
-          include: {
-            layers: true,
-          },
-        },
+        dig: { include: { layers: true } },
       },
-      orderBy: { assignedAt: 'asc' }, // Oldest first
+      orderBy: { assignedAt: 'asc' },
     });
 
-    // If there are incomplete digs, return them (block new digs)
     if (incompleteDigs.length > 0) {
       const responseData = {
         digs: incompleteDigs.map((ud) => ({
@@ -288,28 +267,20 @@ export class DigsService {
       };
     }
 
-    // No incomplete digs - check today's assignment
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const todayDigs = await this.prisma.userDailyDig.findMany({
       where: {
         userId,
-        assignedAt: {
-          gte: today,
-        },
+        assignedAt: { gte: today },
       },
       include: {
-        dig: {
-          include: {
-            layers: true,
-          },
-        },
+        dig: { include: { layers: true } },
       },
       orderBy: { dailyDigNumber: 'asc' },
     });
 
-    // If user already has 2 digs today (both completed), can't get more
     if (todayDigs.length >= 2) {
       return {
         success: false,
@@ -324,27 +295,18 @@ export class DigsService {
       };
     }
 
-    // Determine which dig number to assign (1st or 2nd)
     const nextDigNumber = todayDigs.length + 1;
 
-    // Get a random dig
     const availableDigs = await this.prisma.digs.findMany({
       where: {
-        type: {
-          hasSome: userPlan.focus_area,
-        },
-        // Exclude digs already assigned to this user (avoid repeats)
+        type: { hasSome: userPlan.focus_area },
         NOT: {
           dailyAssignments: {
-            some: {
-              userId,
-            },
+            some: { userId },
           },
         },
       },
-      include: {
-        layers: true,
-      },
+      include: { layers: true },
       take: 20,
     });
 
@@ -356,11 +318,9 @@ export class DigsService {
       };
     }
 
-    // Randomly select 1 dig
     const randomIndex = Math.floor(Math.random() * availableDigs.length);
     const selectedDig = availableDigs[randomIndex];
 
-    // Create UserDailyDig record
     const newDailyDig = await this.prisma.userDailyDig.create({
       data: {
         userId,
@@ -370,11 +330,7 @@ export class DigsService {
         completed: false,
       },
       include: {
-        dig: {
-          include: {
-            layers: true,
-          },
-        },
+        dig: { include: { layers: true } },
       },
     });
 
@@ -398,36 +354,34 @@ export class DigsService {
     };
   }
 
-  // Call this when user completes a dig
   async markDigComplete(userId: string, digId: string) {
     try {
+      // ── Subscription guard ──────────────────────────────────────────────
       const userPlan = await SubscriptionManager(this.prisma, userId);
+
+      if (!userPlan || !userPlan.success) {
+        return {
+          success: false,
+          message: userPlan?.message ?? 'Subscription check failed.',
+        };
+      }
+
+      // TypeScript now knows userPlan is SubscriptionData ✅
       const isFreeUser = userPlan.subscriptionName === 'free';
 
       if (isFreeUser) {
-        // For free users, mark the weekly dig as completed
         const { weekStart } = getWeekBoundaries();
 
         const weeklyDig = await this.prisma.userWeeklyDig.findFirst({
-          where: {
-            userId,
-            digId,
-            weekStart,
-          },
+          where: { userId, digId, weekStart },
         });
 
         if (!weeklyDig) {
-          return {
-            success: false,
-            message: 'Weekly dig not found',
-          };
+          return { success: false, message: 'Weekly dig not found' };
         }
 
         if (weeklyDig.completed) {
-          return {
-            success: false,
-            message: 'Dig already completed',
-          };
+          return { success: false, message: 'Dig already completed' };
         }
 
         await this.prisma.userWeeklyDig.update({
@@ -435,35 +389,21 @@ export class DigsService {
           data: { completed: true },
         });
 
-        // Invalidate cache
         await this.redis.del(`digs:weekly:${userId}:${weekStart.getTime()}`);
 
-        return {
-          success: true,
-          message: 'Dig marked as completed',
-        };
+        return { success: true, message: 'Dig marked as completed' };
       } else {
-        // For paid users, mark the daily dig as completed
         const dailyDig = await this.prisma.userDailyDig.findFirst({
-          where: {
-            userId,
-            digId,
-          },
-          orderBy: { assignedAt: 'desc' }, // Get most recent
+          where: { userId, digId },
+          orderBy: { assignedAt: 'desc' },
         });
 
         if (!dailyDig) {
-          return {
-            success: false,
-            message: 'Daily dig not found',
-          };
+          return { success: false, message: 'Daily dig not found' };
         }
 
         if (dailyDig.completed) {
-          return {
-            success: false,
-            message: 'Dig already completed',
-          };
+          return { success: false, message: 'Dig already completed' };
         }
 
         await this.prisma.userDailyDig.update({
@@ -486,10 +426,19 @@ export class DigsService {
     }
   }
 
-  // Optional: Get user's dig progress/stats
   async getDigProgress(userId: string) {
     try {
+      // ── Subscription guard ──────────────────────────────────────────────
       const userPlan = await SubscriptionManager(this.prisma, userId);
+
+      if (!userPlan || !userPlan.success) {
+        return {
+          success: false,
+          message: userPlan?.message ?? 'Subscription check failed.',
+        };
+      }
+
+      // TypeScript now knows userPlan is SubscriptionData ✅
       const isFreeUser = userPlan.subscriptionName === 'free';
 
       if (isFreeUser) {
@@ -521,10 +470,7 @@ export class DigsService {
         });
 
         const incompleteDigs = await this.prisma.userDailyDig.count({
-          where: {
-            userId,
-            completed: false,
-          },
+          where: { userId, completed: false },
         });
 
         return {
@@ -550,32 +496,22 @@ export class DigsService {
 
   private async generateRandomDig(userId: string) {
     try {
-      // Get total count
       const total = await this.prisma.digs.count();
 
       if (total === 0) {
-        return {
-          success: false,
-          message: 'No digs available',
-        };
+        return { success: false, message: 'No digs available' };
       }
 
-      // Get random dig
       const randomIndex = Math.floor(Math.random() * total);
 
       const dig = await this.prisma.digs.findFirst({
         skip: randomIndex,
         take: 1,
-        include: {
-          layers: true,
-        },
+        include: { layers: true },
       });
 
       if (!dig) {
-        return {
-          success: false,
-          message: 'No dig found',
-        };
+        return { success: false, message: 'No dig found' };
       }
 
       return {
