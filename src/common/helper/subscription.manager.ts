@@ -1,4 +1,3 @@
-import { UserPreferences } from './../../../node_modules/.prisma/client/index.d';
 import { PrismaClient } from '@prisma/client';
 
 export async function SubscriptionManager(
@@ -11,10 +10,21 @@ export async function SubscriptionManager(
   });
 
   if (!userSubscription) {
-    return null;
+    return {
+      success: false,
+      message: 'No subscription found for this user.',
+    };
   }
 
-  let allowedPermission = await prisma.accessForSubscription.findUnique({
+  if (!userSubscription.accessId) {
+    return {
+      success: false,
+      message:
+        'Your subscription is not properly configured. Please contact support.',
+    };
+  }
+
+  const allowedPermission = await prisma.accessForSubscription.findUnique({
     where: {
       id: userSubscription.accessId,
     },
@@ -30,25 +40,35 @@ export async function SubscriptionManager(
     },
   });
 
-  const userPreferences=await prisma.userPreferences.findFirst({
-    where:{
-      user_id:userId
-    }
-  })
+  if (!allowedPermission) {
+    return {
+      success: false,
+      message: 'Subscription plan details not found. Please contact support.',
+    };
+  }
 
-  if(allowedPermission.subscriptionName!=='free'){
-    return{
+  const userPreferences = await prisma.userPreferences.findFirst({
+    where: { user_id: userId },
+  });
+
+  if (allowedPermission.subscriptionName !== 'free') {
+    return {
+      success: true,
       ...userPreferences,
       subscriptionName: allowedPermission.subscriptionName,
       journal_entries: Infinity,
       quotesPerday: Infinity,
       digsPerWeek: Infinity,
       murmurationPostLimit: allowedPermission.murmurationLimit,
-      audioPostJournal:allowedPermission.murmurationLimit,
+      audioPostJournal: allowedPermission.murmurationLimit,
       meditationAccess: allowedPermission.meditationAccess,
       adService: allowedPermission.adService,
-    }
+    };
   }
-  const allowedPermissions={...userPreferences,...allowedPermission}
-  return allowedPermissions;
+
+  return {
+    success: true,
+    ...userPreferences,
+    ...allowedPermission,
+  };
 }
