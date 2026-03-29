@@ -477,42 +477,36 @@ async function main() {
       meditation_name: 'Morning Stillness',
       meditation_description:
         'A gentle 10-minute guided meditation to start your day with clarity and intention. Focus on your breath and let go of yesterday.',
-      meditation_audio: 'storage/audio/morning-stillness.mp3',
       duration: '10:00',
     },
     {
       meditation_name: 'Body Scan for Deep Rest',
       meditation_description:
         'A progressive body scan from head to toe designed to release physical tension and invite deep relaxation.',
-      meditation_audio: 'storage/audio/body-scan.mp3',
       duration: '20:00',
     },
     {
       meditation_name: 'Emotional Release',
       meditation_description:
         'This practice gently guides you to acknowledge and release stored emotions through breath and visualization.',
-      meditation_audio: 'storage/audio/emotional-release.mp3',
       duration: '15:00',
     },
     {
       meditation_name: 'Inner Silence',
       meditation_description:
         'A minimalist meditation that strips everything back to pure awareness. No guidance, just presence.',
-      meditation_audio: 'storage/audio/inner-silence.mp3',
       duration: '08:00',
     },
     {
       meditation_name: 'Heart-Centered Breathing',
       meditation_description:
         'Breathe in compassion, breathe out tension. This heart-focused practice builds emotional resilience and self-love.',
-      meditation_audio: 'storage/audio/heart-breathing.mp3',
       duration: '12:00',
     },
     {
       meditation_name: 'Grounding in Nature',
       meditation_description:
         'Visualize yourself in a peaceful natural setting to restore your connection to the earth and your own body.',
-      meditation_audio: 'storage/audio/grounding-nature.mp3',
       duration: '18:00',
     },
   ];

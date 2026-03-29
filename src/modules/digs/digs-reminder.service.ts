@@ -11,7 +11,7 @@ export class DigsReminderService {
   ) {}
 
   // ── Daily Dig + Journal reminder — 8:00 AM UTC ────────────────────────
-  @Cron('*/3 * * * *', { timeZone: 'UTC' })
+  @Cron('0 7 * * *', { timeZone: 'UTC' })
   async sendDigAndJournalReminders() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -82,7 +82,7 @@ export class DigsReminderService {
   }
 
   // ── Meditation reminder — 7:00 AM UTC ──────────────────────────────────
-  @Cron('*/3 * * * *', { timeZone: 'UTC' })
+  @Cron('0 8 * * *', { timeZone: 'UTC' })
   async sendMeditationReminders() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -125,7 +125,7 @@ export class DigsReminderService {
   }
 
   // ── New content alert — 9:00 AM UTC every Monday ───────────────────────
-  @Cron('*/3 * * * *', { timeZone: 'UTC' })
+  @Cron('0 9 * * 1', { timeZone: 'UTC' })
   async sendNewContentAlerts() {
     const users = await this.prisma.user.findMany({
       where: {
