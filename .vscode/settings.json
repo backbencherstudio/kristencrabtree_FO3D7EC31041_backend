@@ -3,5 +3,14 @@
     "minimap.background": "#00000000",
     "scrollbar.shadow": "#00000000"
   },
-  "liveServer.settings.port": 5501
+  "liveServer.settings.port": 5501,
+  "task.allowAutomaticTasks": true,
+  "debug.openDebug": "neverOpen",
+  "terminal.integrated.inheritEnv": false,
+  "tasks": {
+    "label": "lint on open",
+    "type": "shell",
+    "command": "npm run lint",
+    "runOn": "folderOpen"
+  }
 }

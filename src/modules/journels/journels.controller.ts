@@ -8,16 +8,17 @@ import {
   Delete,
   Req,
   UseInterceptors,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   Query,
 } from '@nestjs/common';
 import { JournelsService } from './journels.service';
 import { CreateJournelDto } from './dto/create-journel.dto';
 import { UpdateJournelDto } from './dto/update-journel.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PaginationDto } from 'src/common/pagination/paginatio.dto';
+import { PaginationDto } from '../../common/pagination/paginatio.dto';
 
 @Controller('journels')
 export class JournelsController {
@@ -25,22 +26,45 @@ export class JournelsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @UseInterceptors(FileInterceptor('audio'))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'audio', maxCount: 1 },
+        { name: 'photos', maxCount: 10 }, // ✅ up to 10 photos
+      ],
+      {
+        storage: memoryStorage(),
+        limits: { fileSize: 20 * 1024 * 1024 }, // 20MB per file
+      },
+    ),
+  )
   async create(
-    @UploadedFile() audio: Express.Multer.File,
+    @UploadedFiles()
+    files: {
+      audio?: Express.Multer.File[];
+      photos?: Express.Multer.File[];
+    },
     @Body() createJournelDto: CreateJournelDto,
     @Req() req: any,
   ) {
     const user_id = req.user?.userId;
-    console.log(req.file)
-    return this.journelsService.create(user_id, createJournelDto, audio);
+    const audio = files?.audio?.[0];
+    const photos = files?.photos || [];
+    return this.journelsService.create(
+      user_id,
+      createJournelDto,
+      audio,
+      photos,
+    );
   }
+
   @UseGuards(JwtAuthGuard)
   @Get('all')
   findAll(@Req() req: any, @Query() paginationDto: PaginationDto) {
     const userId = req.user?.userId;
     return this.journelsService.findAll(userId, paginationDto);
   }
+
   @UseGuards(JwtAuthGuard)
   @Get('recommended')
   getRecommendedJournals(@Req() req: any) {
@@ -54,30 +78,57 @@ export class JournelsController {
     const user_id = req.user?.userId;
     return this.journelsService.getPersonalJournals(user_id, searchTerm);
   }
+
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
     const user_id = req.user?.userId;
     return this.journelsService.findOne(user_id, id);
   }
+
   @UseGuards(JwtAuthGuard)
   @Post('likeUnlike/:id')
   likeJournel(@Param('id') id: string, @Req() req: any) {
     const user_id = req.user?.userId;
     return this.journelsService.toggleLike(user_id, id);
   }
+
   @Patch('update/:id')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('audio'))
-  update(
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'audio', maxCount: 1 },
+        { name: 'photos', maxCount: 10 },
+      ],
+      {
+        storage: memoryStorage(),
+        limits: { fileSize: 20 * 1024 * 1024 },
+      },
+    ),
+  )
+  async update(
     @Param('id') id: string,
     @Body() updateJournelDto: UpdateJournelDto,
     @Req() req: any,
-    @UploadedFile() audio?: Express.Multer.File,
+    @UploadedFiles()
+    files?: {
+      audio?: Express.Multer.File[];
+      photos?: Express.Multer.File[];
+    },
   ) {
     const user_id = req.user?.userId;
-    return this.journelsService.update(user_id, id, updateJournelDto, audio);
+    const audio = files?.audio?.[0];
+    const photos = files?.photos || [];
+    return this.journelsService.update(
+      user_id,
+      id,
+      updateJournelDto,
+      audio,
+      photos,
+    );
   }
+
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: any) {

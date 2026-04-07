@@ -1,14 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateContentManagementDto } from './dto/create-content_management.dto';
 import { UpdateContentManagementDto } from './dto/update-content_management.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { StringHelper } from 'src/common/helper/string.helper';
-import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
-import appConfig from 'src/config/app.config';
 import * as ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { PrismaService } from '../../../prisma/prisma.service';
+import appConfig from '../../../config/app.config';
+import { SojebStorage } from '../../../common/lib/Disk/SojebStorage';
+import { StringHelper } from '../../../common/helper/string.helper';
 // import { PaginationDto } from 'src/common/pagination/paginatio.dto';
 
 @Injectable()

@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateDashboardDto } from './dto/create-dashboard.dto';
 import { UpdateDashboardDto } from './dto/update-dashboard.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
 import {
   getMonthRange,
   getLastNDaysRange,
@@ -9,7 +8,7 @@ import {
   getMonthRangeByYear,
   isPremiumUser,
 } from './helper.utils';
-import { PaginationDto } from 'src/common/pagination/paginatio.dto';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class DashboardService {

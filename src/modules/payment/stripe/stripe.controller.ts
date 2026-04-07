@@ -2,10 +2,10 @@ import { Controller, Post, Req, Headers } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import { Request } from 'express';
 import { TransactionRepository } from '../../../common/repository/transaction/transaction.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { MessageGateway } from 'src/modules/chat/message/message.gateway';
 import Stripe from 'stripe';
 import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { MessageGateway } from '../../chat/message/message.gateway';
 
 @Controller('payment/stripe')
 export class StripeController {

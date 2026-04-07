@@ -5,12 +5,12 @@ import {
 } from '@nestjs/common';
 import { CreateDigDto, SaveResponseItemDto } from './dto/create-dig.dto';
 import { UpdateDigDto } from './dto/update-dig.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { validate } from 'class-validator';
 import Redis from 'ioredis';
 import { InjectRedis } from '@nestjs-modules/ioredis';
-import { SubscriptionManager } from 'src/common/helper/subscription.manager';
-import { getLevelFromTotalXp } from 'src/modules/auth/helper';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { SubscriptionManager } from '../../../common/helper/subscription.manager';
+import { getLevelFromTotalXp } from '../../auth/helper';
 
 function getWeekBoundaries(date: Date = new Date()) {
   const current = new Date(date);
@@ -81,7 +81,7 @@ export class DigsService {
       return {
         success: false,
         message: 'Error creating dig',
-        error: error.message,
+        error: (error as Error).message,
       };
     }
   }
@@ -173,11 +173,11 @@ export class DigsService {
         };
 
       let options: string[] = [];
-      if (Array.isArray(layer.options)) {
+      if (Array.isArray((layer.options as any))) {
         options = layer.options as string[];
-      } else if (typeof layer.options === 'string') {
+      } else if (typeof (layer.options as any) === 'string') {
         try {
-          options = JSON.parse(layer.options);
+          options = JSON.parse(layer.options as any);
         } catch {
           return {
             success: false,
@@ -386,7 +386,7 @@ export class DigsService {
       return {
         success: false,
         message: 'Error retrieving dig responses',
-        error: error.message,
+        error: (error as Error).message,
       };
     }
   }
@@ -473,7 +473,7 @@ export class DigsService {
       return {
         success: false,
         message: 'Error updating dig',
-        error: error.message,
+        error: (error as Error).message,
       };
     }
   }

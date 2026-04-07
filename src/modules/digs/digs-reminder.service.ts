@@ -1,7 +1,7 @@
 import { Cron } from '@nestjs/schedule';
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { FirebaseService } from '../firebase/firebase.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class DigsReminderService {
@@ -22,7 +22,7 @@ export class DigsReminderService {
         fcm_token: { not: null },
         OR: [
           { notificationSettings: { is: null } },
-          { notificationSettings: { is: { notification_reminder: true } } },
+          // { notificationSettings: { is: { notification_reminder: true } } },
         ],
       },
       include: { notificationSettings: true },

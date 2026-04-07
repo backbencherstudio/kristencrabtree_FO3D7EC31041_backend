@@ -36,7 +36,7 @@ model User {
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now())
   deleted_at DateTime?
-  status     Int?      @default(1) @db.SmallInt //1=active, 2=suspended, 3=under review
+  status     Int?      @default(1) @db.SmallInt // 1=active, 2=suspended, 3=under review
 
   approved_at  DateTime?
   availability String?
@@ -59,29 +59,38 @@ model User {
   gender        String?
   date_of_birth DateTime? @db.Date
   fcm_token     String?
-  // billing id. e.g. stripe customer id
-  billing_id    String?
+  billing_id    String?   // e.g. Stripe Customer ID
 
   type              String?   @default("user")
   email_verified_at DateTime?
 
   is_agrred_to_terms_and_policy Boolean?
-  is_two_factor_enabled         Int?           @default(0)
-  two_factor_secret             String? // secret key for two factor authentication
-  subscriptionValidUntil        String? // subscription valid until
-  subscriptionPlan              String?        @default("free") // subscription plan name
-  accounts                      Account[]
-  creator_conversations         Conversation[] @relation("creator")
-  participant_conversations     Conversation[] @relation("participant")
-  receiver_messages             Message[]      @relation("receiver")
+  is_two_factor_enabled         Int?     @default(0)
+  two_factor_secret             String?
+  subscriptionValidUntil        String?
+  subscriptionPlan              String?  @default("free")
 
-  sender_messages        Message[]      @relation("sender")
-  receiver_notifications Notification[] @relation("receiver")
-  sender_notifications   Notification[] @relation("sender")
-  firebaseUid            String?
-  apple_id               String?
-  currentLevel           Int?           @default(0)
-  acheivedXp             Int?           @default(0)
+  firebaseUid String?
+  apple_id    String?
+
+  // ── XP & Level ──────────────────────────────────────────────────────────
+  currentLevel Int? @default(0)
+  acheivedXp   Int? @default(0)
+  // XP microcopy (client requirement):
+  // "XP reflects your engagement — not your progress."
+  // Tooltip: "XP reflects time spent engaging with your inner work — not how well you're doing."
+
+  // ── Days Engaged (client prefers "Days Engaged" over "Day Streak") ──────
+  daysEngaged Int? @default(0)
+
+  // ── Relations ────────────────────────────────────────────────────────────
+  accounts                  Account[]
+  creator_conversations     Conversation[] @relation("creator")
+  participant_conversations Conversation[] @relation("participant")
+  receiver_messages         Message[]      @relation("receiver")
+  sender_messages           Message[]      @relation("sender")
+  receiver_notifications    Notification[] @relation("receiver")
+  sender_notifications      Notification[] @relation("sender")
 
   user_payment_methods UserPaymentMethod[]
   user_settings        UserSetting[]
@@ -106,13 +115,17 @@ model User {
   weeklyDigs           UserWeeklyDig[]
   dailyDigs            UserDailyDig[]
   notificationSettings NotificationSettings?
+  digResponses         DigResponse[]
+  digProgress          UserDigProgress[]     // ✅ pause/resume tracking
+  murmurationBookmarks MurmurationBookmark[]
 
   @@map("users")
 }
 
-///////////////////////////////
-//////// User Preferences /////
-///////////////////////////////
+// ════════════════════════════════════════════════════════════════════════════
+// USER PREFERENCES
+// ════════════════════════════════════════════════════════════════════════════
+
 enum Focus_Area {
   Mental_Body
   Emotional_Body
@@ -163,9 +176,10 @@ model UserPreferences {
   @@map("user_preferences")
 }
 
-////////////////////////////////
-//////// Plans /////////////////
-////////////////////////////////
+// ════════════════════════════════════════════════════════════════════════════
+// PLANS & SUBSCRIPTIONS
+// ════════════════════════════════════════════════════════════════════════════
+
 model Plans {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -179,9 +193,8 @@ model Plans {
   tag         String?
   features    String[]
 
-  // Stripe fields
-  stripe_product_id String? @unique // prod_xxxxxxxxxx
-  stripe_price_id   String? @unique // price_xxxxxxxxxx
+  stripe_product_id String? @unique
+  stripe_price_id   String? @unique
 
   userSubscriptions UserSubscription[]
 
@@ -202,13 +215,32 @@ model UserSubscription {
   cardLast4            String?
   method               String?
   accessId             String?
-  // access                accessForSubscription?  @relation(fields: [accessId], references: [id])
   user                 User?                @relation(fields: [userId], references: [id])
   created_at           DateTime             @default(now())
   updated_at           DateTime             @default(now())
   plans                Plans?               @relation(fields: [plansId], references: [id])
   plansId              String?
 }
+
+model accessForSubscription {
+  id               String   @unique
+  subscriptionName String?  @unique
+  journal_entries  Int?
+  quotesPerday     Int?
+  digsPerWeek      Int?
+  murmurationLimit Boolean?
+  audioPostJournal Boolean?
+  meditationAccess Boolean?
+  adService        Boolean?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("subscription_access")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AUTH & ROLES
+// ════════════════════════════════════════════════════════════════════════════
 
 model Ucode {
   id         String   @id @default(cuid())
@@ -293,7 +325,10 @@ model RoleUser {
   @@map("role_users")
 }
 
-// this table stores notification event
+// ════════════════════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ════════════════════════════════════════════════════════════════════════════
+
 model NotificationEvent {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -316,8 +351,7 @@ model Notification {
   deleted_at DateTime?
 
   read_at DateTime?
-
-  status Int? @default(1) @db.SmallInt
+  status  Int?      @default(1) @db.SmallInt
 
   sender_id String?
   sender    User?   @relation("sender", fields: [sender_id], references: [id])
@@ -341,14 +375,19 @@ model NotificationSettings {
   user_id String @unique
   user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  meditation_reminders  Boolean @default(true)
-  new_content_alerts    Boolean @default(true)
-  community_updates     Boolean @default(true)
-  notification_reminder Boolean @default(true)
-  email_updates         Boolean @default(true)
+  // Client requirement: notifications = user-controlled reminders, not activity log
+  dig_reminders        Boolean @default(true)  // ✅ renamed from notification_reminder
+  meditation_reminders Boolean @default(true)
+  new_content_alerts   Boolean @default(true)
+  community_updates    Boolean @default(true)
+  email_updates        Boolean @default(true)
 
   @@map("notification_settings")
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// PAYMENTS
+// ════════════════════════════════════════════════════════════════════════════
 
 model UserPaymentMethod {
   id         String    @id @default(cuid())
@@ -393,7 +432,9 @@ model PaymentTransaction {
   @@map("payment_transactions")
 }
 
-// ---------Start Chat schema---------
+// ════════════════════════════════════════════════════════════════════════════
+// CHAT
+// ════════════════════════════════════════════════════════════════════════════
 
 enum MessageStatus {
   PENDING
@@ -402,7 +443,6 @@ enum MessageStatus {
   READ
 }
 
-// message is used for conversation
 model Message {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -428,7 +468,6 @@ model Message {
   @@map("messages")
 }
 
-// this table stores attachment of message
 model Attachment {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -446,7 +485,6 @@ model Attachment {
   @@map("attachments")
 }
 
-// this table stores conversation
 model Conversation {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -464,7 +502,9 @@ model Conversation {
   @@map("conversations")
 }
 
-// ---------End Chat schema---------
+// ════════════════════════════════════════════════════════════════════════════
+// MISC
+// ════════════════════════════════════════════════════════════════════════════
 
 model Faq {
   id         String    @id @default(cuid())
@@ -562,26 +602,6 @@ model UserSetting {
   @@map("user_settings")
 }
 
-// this table stores example
-// model Note {
-//   id                String  @id @default(cuid())
-//   created_at DateTime  @default(now())
-//   updated_at DateTime  @default(now())
-//   deleted_at DateTime?
-//   status     Int?      @default(1) @db.SmallInt
-
-//   title String?
-//   body  String? @db.Text
-
-//   tenant_id Int?
-//   tenant    Organization? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-//   @@map("posts")
-// }
-
-///////////////////////////////////////
-//////// model Content ////////////////
-///////////////////////////////////////
-
 model Content {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -598,9 +618,15 @@ model Content {
   @@map("contents")
 }
 
-///////////////////////////////////////
-//////// Home page////////////////// 
-///////////////////////////////////////
+// ════════════════════════════════════════════════════════════════════════════
+// QUOTES
+// Client requirements:
+// - Admin uploads preloaded quotes
+// - Users can add their own quotes
+// - Combined randomized pool for display
+// - Favorite/like flow
+// - Edit and delete for user-added quotes
+// ════════════════════════════════════════════════════════════════════════════
 
 model Quote {
   id         String    @id @default(cuid())
@@ -612,8 +638,10 @@ model Quote {
   quote_text   String?      @db.Text
   reason       String?      @db.Text
   type         Focus_Area[]
+  status       Boolean?     @default(true)
 
-  status Boolean? @default(true)
+  // source: 'admin' = preloaded by owner, 'user' = added by user
+  source  String? @default("admin") // ✅ 'admin' | 'user'
 
   user_id        String?
   user           User?           @relation(fields: [user_id], references: [id])
@@ -635,9 +663,19 @@ model QuoteReaction {
   @@id([userId, qouteId])
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// JOURNAL
+// Client requirements:
+// - Text, Audio, Photos
+// - Free: text + photo only
+// - Paid: audio included
+// - Editable, retrievable
+// ════════════════════════════════════════════════════════════════════════════
+
 enum JournalType {
   Text
   Audio
+  Photo
 }
 
 model Journel {
@@ -647,10 +685,11 @@ model Journel {
   deleted_at DateTime?
   type       JournalType?
 
-  title String?
-  body  String?  @db.Text
-  audio String?
-  tags  String[]
+  title  String?
+  body   String?  @db.Text
+  audio  String?           // stored as filename only
+  photos String[]          // stored as full paths e.g. /journal-photos/file.jpg
+  tags   String[]
 
   user_id      String?
   user         User?         @relation(fields: [user_id], references: [id])
@@ -672,6 +711,17 @@ model LikeJournel {
   @@id([userId, journelId])
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// MURMURATION (Community)
+// Client requirements:
+// - Lives in app, not website
+// - Free users: read-only
+// - Paid users: post, reply, react, bookmark
+// - Admin can create topics
+// - Users can create topics
+// - Supportive tone, not social media
+// ════════════════════════════════════════════════════════════════════════════
+
 enum MurmurationType {
   Text
   Image
@@ -683,21 +733,30 @@ model Murmuration {
   created_at DateTime         @default(now())
   updated_at DateTime         @updatedAt
   deleted_at DateTime?
-  type       MurmurationType?
-  title      String?
-  user_id    String?
-  user       User?            @relation(fields: [user_id], references: [id])
+
+  type  MurmurationType?
+  title String?
+
+  // ✅ Topic support (client wants topics like "Who Am I", "The Four Bodies")
+  topic String?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id])
 
   text  String? @db.Text
   image String?
   audio String?
 
+  // ✅ Shared post support
   shared_from_id String?
   shared_from    Murmuration?  @relation("MurmurationShares", fields: [shared_from_id], references: [id])
   shares         Murmuration[] @relation("MurmurationShares")
 
   comments         Comments[]
   murmurationLikes MurmurationLike[]
+
+  // ✅ Bookmark support (client wants save/bookmark)
+  bookmarks MurmurationBookmark[]
 
   @@map("murmurations")
 }
@@ -713,6 +772,21 @@ model MurmurationLike {
   @@index([murmurationId])
 }
 
+// ✅ NEW — bookmark/save murmuration posts
+model MurmurationBookmark {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+
+  userId        String
+  murmurationId String
+
+  user        User        @relation(fields: [userId], references: [id])
+  murmuration Murmuration @relation(fields: [murmurationId], references: [id])
+
+  @@unique([userId, murmurationId])
+  @@map("murmuration_bookmarks")
+}
+
 model Comments {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -726,10 +800,10 @@ model Comments {
   murmuration    Murmuration? @relation(fields: [murmuration_id], references: [id])
 
   reply_to_comment_id String?
-  reply_to_comment    Comments? @relation("CommentReplies", fields: [reply_to_comment_id], references: [id])
+  reply_to_comment    Comments?  @relation("CommentReplies", fields: [reply_to_comment_id], references: [id])
+  comments            Comments[] @relation("CommentReplies")
 
   body         String?       @db.Text
-  comments     Comments[]    @relation("CommentReplies")
   commentLikes CommentLike[]
 
   @@map("comments")
@@ -746,6 +820,20 @@ model CommentLike {
   @@index([commentId])
 }
 
+// ✅ Add to User model relation
+// bookmarks MurmurationBookmark[]
+
+// ════════════════════════════════════════════════════════════════════════════
+// MEDITATION
+// Client requirements:
+// - Owner-uploaded content only (no affiliate links)
+// - MP3 audio + MP4 video support
+// - Title, description, content management
+// - "Who Am I?" as specific experience
+// - Save/favorite meditations
+// - Paid users only
+// ════════════════════════════════════════════════════════════════════════════
+
 model Meditation {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
@@ -754,8 +842,18 @@ model Meditation {
 
   meditation_name        String?
   meditation_description String?
-  meditation_audio       String?
+  meditation_audio       String?  // MP3 — stored as path
+  meditation_video       String?  // MP4 — stored as path ✅
+  thumbnail              String?  // cover image ✅
   duration               String?
+  type                   String?  @default("audio") // 'audio' | 'video' ✅
+  is_premium             Boolean  @default(true)    // paid users only ✅
+
+  // ✅ Category tag — e.g. "Who Am I", "Mind Expansion"
+  category String?
+
+  // ✅ Sort order for admin control
+  sort_order Int? @default(0)
 
   listeners           MeditationListener[]
   favoriteMeditations favoriteMeditation[]
@@ -789,14 +887,28 @@ model favoriteMeditation {
   @@map("favorite_meditation")
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// DIGS (The Core Experience)
+// Client requirements:
+// - "Dig" = full container, "Layer" = depth within
+// - 4 layers: The Question → Explore → The Experience → Reflect
+// - Users can pause at any layer and resume later
+// - Free: 3 digs/week, Paid: unlimited
+// - XP for engagement (not correctness)
+// - Categorized by 4 bodies: Mental, Emotional, Physical, Energy
+// ════════════════════════════════════════════════════════════════════════════
+
 model Digs {
   id         String    @id @default(cuid())
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  title String
-  type  Focus_Area[]
+  title       String
+  description String?  // ✅ dig description
+
+  // Categorized by the four bodies (client requirement)
+  type Focus_Area[]
 
   user_id String?
   user    User?   @relation(fields: [user_id], references: [id])
@@ -807,13 +919,27 @@ model Digs {
   digResponses      DigResponse[]
   weeklyAssignments UserWeeklyDig[]
   dailyAssignments  UserDailyDig[]
+  userProgress      UserDigProgress[] // ✅ pause/resume
 
   @@map("digs")
 }
 
+// Layer types
 enum Type {
   Text
   Option
+}
+
+// Layer titles mapped to client language:
+// The_Question  = "The Question"  (Layer 1)
+// The_Journal   = "Explore"       (Layer 2)
+// The_Experience = "The Experience" (Layer 3)
+// The_Reflection = "Reflect"      (Layer 4)
+enum LayerTitle {
+  The_Question
+  The_Journal
+  The_Experience
+  The_Reflection
 }
 
 model Layers {
@@ -828,27 +954,31 @@ model Layers {
   dig_id String
   dig    Digs   @relation(fields: [dig_id], references: [id], onDelete: Cascade)
 
-  question_name LayerTitle?  // ← changed from String? to enum
+  // ✅ Layer number (1-4) for ordering and position display
+  layer_number  Int?
+  question_name LayerTitle?
   question_type Type?
-  point         Int?
+  point         Int?        // XP points awarded for engagement
   question      String?
 
+  // ✅ Transition message shown after completing this layer
+  // Default: "Noticing this is where change begins."
+  transition_message String? @default("Noticing this is where change begins.")
+
+  // Layer 1: option-based question
   options        String[]
-  other          Boolean?
-  other_text     String?
-  text           String?
-  correct_answer String?    // ← new field
+  other          Boolean? // ✅ always allow "Other" option (client requirement)
+  other_text     String?  // placeholder for other text box
+
+  // Layer 2 & 4: journaling/text
+  text String?
+
+  // Layer 3: experience/action prompt
+  correct_answer String?
 
   digResponses DigResponse[]
 
   @@map("layers")
-}
-
-enum LayerTitle {
-  The_Question
-  The_Journal
-  The_Experience
-  The_Reflection
 }
 
 model DigResponse {
@@ -859,26 +989,35 @@ model DigResponse {
   response   String?
   is_correct Boolean?
   created_at DateTime @default(now())
+  updated_at DateTime @default(now()) // ✅ for resume/edit tracking
 
   dig   Digs   @relation(fields: [dig_id], references: [id])
   layer Layers @relation(fields: [layer_id], references: [id])
+  user  User   @relation(fields: [user_id], references: [id])
+
+  // ✅ One response per user per layer per dig
+  @@unique([user_id, dig_id, layer_id])
+  @@map("dig_responses")
 }
 
-model accessForSubscription {
-  id               String   @unique
-  subscriptionName String?  @unique
-  journal_entries  Int?
-  quotesPerday     Int?
-  digsPerWeek      Int?
-  murmurationLimit Boolean?
-  audioPostJournal Boolean?
-  meditationAccess Boolean?
-  adService        Boolean?
-  // userSubscription     UserSubscription?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+// ✅ NEW — Track which layer user paused on (pause/resume support)
+// Client requirement: "Users need to be able to pause at any layer, leave,
+// and return later to the exact same place."
+model UserDigProgress {
+  id             String    @id @default(cuid())
+  user_id        String
+  dig_id         String
+  current_layer  Int       @default(1) // which layer they are currently on
+  started_at     DateTime  @default(now())
+  last_active_at DateTime  @default(now())
+  completed      Boolean   @default(false)
+  completed_at   DateTime?
 
-  @@map("subscription_access")
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  dig  Digs @relation(fields: [dig_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, dig_id])
+  @@map("user_dig_progress")
 }
 
 model UserWeeklyDig {
@@ -886,7 +1025,7 @@ model UserWeeklyDig {
   userId    String
   digId     String
   weekStart DateTime
-  position  Int // 1, 2, 3 (reveal order)
+  position  Int      // 1, 2, 3 (reveal order) — free users get 3/week
   completed Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id])
@@ -905,7 +1044,7 @@ model UserDailyDig {
   userId         String
   digId          String
   assignedAt     DateTime @default(now())
-  dailyDigNumber Int // 1 or 2 (first or second dig of that day)
+  dailyDigNumber Int      // position in sequence for paid users (unlimited)
   completed      Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -915,4 +1054,32 @@ model UserDailyDig {
   @@index([userId, completed])
   @@index([userId, assignedAt])
   @@map("user_daily_digs")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ADS
+// Client requirements:
+// - Not banners, not persistent
+// - Between Digs only (not between layers)
+// - Full-screen/interstitial with X to close
+// - Only owner's own products (book, journal, apparel, cards, etc.)
+// - Paid users never see ads
+// ════════════════════════════════════════════════════════════════════════════
+
+model Ad {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  title       String?
+  description String?
+  image       String?  // ad image path
+  link_url    String?  // where it takes the user (book, shop, etc.)
+  product_type String? // 'book' | 'journal' | 'apparel' | 'cards' | 'life_calendar' | 'other'
+
+  is_active  Boolean @default(true)
+  sort_order Int?    @default(0)
+
+  @@map("ads")
 }
