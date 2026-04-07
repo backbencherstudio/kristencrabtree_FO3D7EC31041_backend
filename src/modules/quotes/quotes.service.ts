@@ -1,10 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { count } from 'console';
-import { SubscriptionManager } from 'src/common/helper/subscription.manager';
 import Redis from 'ioredis';
 import { InjectRedis } from '@nestjs-modules/ioredis';
+import { PrismaService } from '../../prisma/prisma.service';
 @Injectable()
 export class QuotesService {
   constructor(
@@ -38,7 +36,7 @@ export class QuotesService {
       return {
         success: false,
         message: 'Failed to create quote',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -81,7 +79,7 @@ export class QuotesService {
       return {
         success: false,
         message: 'Failed to fetch quotes',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -114,7 +112,7 @@ export class QuotesService {
       return {
         success: false,
         message: 'Failed to retrieve quote',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -166,7 +164,7 @@ export class QuotesService {
       return {
         success: false,
         message: 'Failed to delete quote',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -245,7 +243,7 @@ export class QuotesService {
       return {
         success: false,
         message: 'An error occurred while processing the request',
-        error: error.message,
+        error: (error as Error).message,
       };
     }
   }
@@ -306,7 +304,7 @@ export class QuotesService {
       return {
         success: false,
         message: 'Failed to fetch random quotes',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }

@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { StripePayment } from '../../../common/lib/Payment/stripe/StripePayment';
 import Stripe from 'stripe';
-import appConfig from 'src/config/app.config';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import appConfig from '../../../config/app.config';
 
 @Injectable()
 export class StripeService {

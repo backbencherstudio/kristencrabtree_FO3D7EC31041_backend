@@ -2,7 +2,7 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import appConfig from 'src/config/app.config';
+import appConfig from '../../config/app.config';
 
 @Processor('mail-queue5')
 export class MailProcessor extends WorkerHost {

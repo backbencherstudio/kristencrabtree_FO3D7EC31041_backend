@@ -13,9 +13,9 @@ import {
 } from '@nestjs/common';
 import { DigsService } from './digs.service';
 import { CreateDigDto, SaveResponseDto } from './dto/create-dig.dto';
-import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { UpdateDigDto } from './dto/update-dig.dto';
-import { PaginationDto } from 'src/common/pagination/paginatio.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PaginationDto } from '../../../common/pagination/paginatio.dto';
 
 @Controller('admin/digs')
 export class DigsController {

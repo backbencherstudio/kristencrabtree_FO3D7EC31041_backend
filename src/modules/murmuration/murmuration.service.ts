@@ -3,13 +3,12 @@ import {
   CreateCommentDto,
   CreateMurmurationDto,
 } from './dto/create-murmuration.dto';
-import { UpdateMurmurationDto } from './dto/update-murmuration.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { StringHelper } from 'src/common/helper/string.helper';
-import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
-import appConfig from 'src/config/app.config';
 import { MurmurationType } from '@prisma/client';
-import { SubscriptionManager } from 'src/common/helper/subscription.manager';
+import { PrismaService } from '../../prisma/prisma.service';
+import { SubscriptionManager } from '../../common/helper/subscription.manager';
+import { StringHelper } from '../../common/helper/string.helper';
+import appConfig from '../../config/app.config';
+import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
 
 @Injectable()
 export class MurmurationService {
@@ -190,7 +189,7 @@ export class MurmurationService {
       return {
         success: false,
         message: 'Failed to create murmuration',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -279,7 +278,7 @@ export class MurmurationService {
       return {
         success: false,
         message: 'Failed to fetch murmurations',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -437,7 +436,7 @@ export class MurmurationService {
       return {
         success: false,
         message: 'Failed to fetch murmuration',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
@@ -505,7 +504,7 @@ export class MurmurationService {
       return {
         success: false,
         message: 'Failed to add comment',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }

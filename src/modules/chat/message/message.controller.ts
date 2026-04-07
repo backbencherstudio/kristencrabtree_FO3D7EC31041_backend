@@ -13,7 +13,7 @@ import { MessageGateway } from './message.gateway';
 import { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @ApiBearerAuth()
 @ApiTags('Message')
@@ -85,7 +85,7 @@ export class MessageController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }

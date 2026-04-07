@@ -17,6 +17,7 @@ export interface SingleNotificationResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  skipped?: boolean;
 }
 
 export interface MultiNotificationResult {

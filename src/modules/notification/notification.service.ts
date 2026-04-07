@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Role } from 'src/common/guard/role/role.enum';
-import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
-import { UserRepository } from 'src/common/repository/user/user.repository';
-import appConfig from 'src/config/app.config';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateNotificationSettingsDto } from './dto/notification-setting.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UserRepository } from '../../common/repository/user/user.repository';
+import { Role } from '../../common/guard/role/role.enum';
+import appConfig from '../../config/app.config';
+import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
 
 @Injectable()
 export class NotificationService {
@@ -20,7 +20,7 @@ export class NotificationService {
         meditation_reminders: true,
         new_content_alerts: true,
         community_updates: true,
-        notification_reminder: true,
+        // notification_reminder: true,
         email_updates: true,
       },
     });
@@ -36,7 +36,7 @@ export class NotificationService {
         meditation_reminders: dto.meditation_reminders ?? true,
         new_content_alerts: dto.new_content_alerts ?? true,
         community_updates: dto.community_updates ?? true,
-        notification_reminder: dto.notification_reminder ?? true,
+        // notification_reminder: dto.notification_reminder ?? true,
         email_updates: dto.email_updates ?? true,
       },
     });
@@ -103,7 +103,7 @@ export class NotificationService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -138,7 +138,7 @@ export class NotificationService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -172,7 +172,7 @@ export class NotificationService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }

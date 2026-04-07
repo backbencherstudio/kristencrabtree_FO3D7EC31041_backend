@@ -99,6 +99,7 @@ export default () => ({
     image: '/image/',
     // chat
     attachment: '/attachment/',
+    photo: '/journal-photos/',
   },
 
   defaultUser: {

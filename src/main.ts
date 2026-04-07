@@ -35,6 +35,11 @@ async function bootstrap() {
   //   }
   //   next();
   // });
+
+  app.useStaticAssets(join(__dirname, '..', 'public'), {
+    index: false,
+    prefix: '/public',
+  });
   app.useStaticAssets(path.join(process.cwd(), 'public'), {
     index: false,
     prefix: '/public',

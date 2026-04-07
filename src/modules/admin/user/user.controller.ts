@@ -18,7 +18,7 @@ import { Roles } from '../../../common/guard/role/roles.decorator';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { userActionDto } from './dto/user-action.dto';
-import { PaginationDto } from 'src/common/pagination/paginatio.dto';
+import { PaginationDto } from '../../../common/pagination/paginatio.dto';
 
 @ApiBearerAuth()
 @ApiTags('User')
@@ -37,7 +37,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -56,7 +56,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -72,7 +72,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -88,7 +88,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -102,7 +102,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -115,7 +115,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -128,7 +128,7 @@ export class UserController {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }

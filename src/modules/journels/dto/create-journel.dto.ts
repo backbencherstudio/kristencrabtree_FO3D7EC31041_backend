@@ -1,9 +1,10 @@
-import { IsString, IsOptional, IsArray, IsEnum } from "class-validator";
-import { Transform } from "class-transformer";
+import { IsString, IsOptional, IsArray, IsEnum } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export enum JournalType {
-  Text = "Text",
-  Audio = "Audio"
+  Text = 'Text',
+  Audio = 'Audio',
+  Photo = 'Photo',
 }
 
 export class CreateJournelDto {

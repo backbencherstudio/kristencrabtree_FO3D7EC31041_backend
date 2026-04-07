@@ -21,11 +21,9 @@ import { MailService } from '../../mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserPreferencesDto } from './dto/updateUserPreferences.dto';
-import { DigsService } from '../admin/digs/digs.service';
+import { getLevelXpRange } from './helper';
 import * as bcrypt from 'bcrypt';
-import { SubscriptionManager } from 'src/common/helper/subscription.manager';
-import { calculateUserDigPoints, getLevelXpRange } from './helper';
-import admin from 'src/config/firebase-admin';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -209,7 +207,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -308,8 +306,8 @@ export class AuthService {
         },
         type: user.type,
       };
-    } catch (error) {
-      return { success: false, message: error.message };
+    } catch (error: any) {
+      return { success: false, message: (error as Error).message };
     }
   }
 
@@ -440,7 +438,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -464,7 +462,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -554,8 +552,8 @@ export class AuthService {
         message: 'Account created successfully',
         data: { accessToken, refreshToken },
       };
-    } catch (error) {
-      return { success: false, message: error.message };
+    } catch (error: any) {
+      return { success: false, message: (error as Error).message };
     }
   }
 
@@ -654,7 +652,7 @@ export class AuthService {
       return {
         success: false,
         message: 'Failed to update user preferences',
-        error: error.message,
+        error: (error as Error).message,
       };
     }
   }
@@ -691,7 +689,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -735,7 +733,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -779,7 +777,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -850,7 +848,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -903,7 +901,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -939,7 +937,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -978,7 +976,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -1033,7 +1031,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -1192,7 +1190,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -1204,7 +1202,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -1225,7 +1223,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -1248,7 +1246,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }
@@ -1271,7 +1269,7 @@ export class AuthService {
     } catch (error) {
       return {
         success: false,
-        message: error.message,
+        message: (error as Error).message,
       };
     }
   }

@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
 import Stripe from 'stripe';
-import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
 import { Prisma } from '@prisma/client';
-import { MessageGateway } from 'src/modules/chat/message/message.gateway';
-import { StripeService } from 'src/modules/payment/stripe/stripe.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { MessageGateway } from '../../chat/message/message.gateway';
+import { StripeService } from '../../payment/stripe/stripe.service';
+import { StripePayment } from '../../../common/lib/Payment/stripe/StripePayment';
 @Injectable()
 export class PlansService {
   private stripe: Stripe;

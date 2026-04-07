@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
-import { PrismaService } from 'src/prisma/prisma.service';
 import {
   MultiNotificationResult,
   NotificationOptions,
   NotificationPayload,
   SingleNotificationResult,
 } from './firebase.interface';
+import { PrismaService } from '../../prisma/prisma.service';
 
 const DEFAULT_IMAGE = 'https://i.ibb.co/0RyBBrwd/memo-14.png';
 
@@ -77,7 +77,7 @@ export class FirebaseService {
         meditation_reminders: true,
         new_content_alerts: true,
         community_updates: true,
-        notification_reminder: true,
+        // notification_reminder: true,
       },
     });
 
@@ -159,7 +159,7 @@ export class FirebaseService {
         },
       });
     } catch (err) {
-      this.logger.warn(`saveNotification failed: ${err.message}`);
+      this.logger.warn(`saveNotification failed: ${(err as any).message}`);
     }
   }
 
@@ -178,6 +178,7 @@ export class FirebaseService {
         );
         return {
           success: false,
+          skipped: true,
           error: 'Notification disabled by user',
         };
       }
@@ -195,7 +196,7 @@ export class FirebaseService {
 
       return { success: true, messageId };
     } catch (err) {
-      const isInvalidToken = INVALID_TOKEN_CODES.includes(err.code);
+      const isInvalidToken = INVALID_TOKEN_CODES.includes((err as any).code);
 
       if (isInvalidToken) {
         // Clear stale token from DB — won't be used again
@@ -203,12 +204,16 @@ export class FirebaseService {
           where: { fcm_token: token },
           data: { fcm_token: null },
         });
-        this.logger.warn(`Cleared invalid FCM token [code: ${err.code}]`);
+        this.logger.warn(
+          `Cleared invalid FCM token [code: ${(err as any).code}]`,
+        );
         return { success: false, error: 'Invalid token — cleared' };
       }
 
-      this.logger.error(`sendToOne failed: ${err.message} [code: ${err.code}]`);
-      return { success: false, error: err.message };
+      this.logger.error(
+        `sendToOne failed: ${(err as any).message} [code: ${(err as any).code}]`,
+      );
+      return { success: false, error: (err as any).message };
     }
   }
 
@@ -245,11 +250,11 @@ export class FirebaseService {
     const mapped = results.map((r) =>
       r.status === 'fulfilled'
         ? r.value
-        : { success: false, error: r.reason?.message },
+        : { success: false, skipped: false, error: r.reason?.message },
     );
 
     const totalSent = mapped.filter((r) => r.success).length;
-    const totalSkipped = mapped.filter((r) => (r as any).skipped).length;
+    const totalSkipped = mapped.filter((r) => r.skipped).length;
     const totalFailed = mapped.length - totalSent - totalSkipped;
 
     this.logger.log(

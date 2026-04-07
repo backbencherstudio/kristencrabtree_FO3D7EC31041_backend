@@ -16,9 +16,9 @@ import {
 import { ContentManagementService } from './content_management.service';
 import { CreateContentManagementDto } from './dto/create-content_management.dto';
 import { UpdateContentManagementDto } from './dto/update-content_management.dto';
-import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { PaginationDto } from 'src/common/pagination/paginatio.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PaginationDto } from '../../../common/pagination/paginatio.dto';
 
 @Controller('admin/content-management')
 export class ContentManagementController {
@@ -44,15 +44,14 @@ export class ContentManagementController {
       return {
         success: false,
         message: 'Failed to create journel',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
 
-
   @UseGuards(JwtAuthGuard)
   @Get('allqoutes')
-  findAll(@Req() req: any,@Query() pagintionDto:PaginationDto) {
+  findAll(@Req() req: any, @Query() pagintionDto: PaginationDto) {
     const userId = req.user.userId;
     if (userId === null) {
       return {
@@ -65,15 +64,18 @@ export class ContentManagementController {
 
   @UseGuards(JwtAuthGuard)
   @Get('meditations')
-  findAllM(@Req() req: any,@Query() pagintionDto:PaginationDto) {
+  findAllM(@Req() req: any, @Query() pagintionDto: PaginationDto) {
     const userId = req.user?.userId;
-    return this.contentManagementService.findAllMeditations(userId,pagintionDto);
+    return this.contentManagementService.findAllMeditations(
+      userId,
+      pagintionDto,
+    );
   }
 
-   // @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Get('medi/:id')
-  async getSingleMeditation(@Param('id') id:string){
-    return await this.contentManagementService.getOneMeditation(id)
+  async getSingleMeditation(@Param('id') id: string) {
+    return await this.contentManagementService.getOneMeditation(id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -93,16 +95,25 @@ export class ContentManagementController {
 
   @UseGuards(JwtAuthGuard)
   @Post('addlistener/:meditation_id')
-  async addListener(@Param('meditation_id') meditation_id: string, @Req() req: any) {
+  async addListener(
+    @Param('meditation_id') meditation_id: string,
+    @Req() req: any,
+  ) {
     const userId = req.user?.userId;
     return this.contentManagementService.addListener(userId, meditation_id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('addfavorite/:meditation_id')
-  async addFavorite(@Param('meditation_id') meditation_id: string, @Req() req: any) {
+  async addFavorite(
+    @Param('meditation_id') meditation_id: string,
+    @Req() req: any,
+  ) {
     const userId = req.user?.userId;
-    return this.contentManagementService.addFavoriteMeditation(userId, meditation_id);
+    return this.contentManagementService.addFavoriteMeditation(
+      userId,
+      meditation_id,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -126,11 +137,11 @@ export class ContentManagementController {
       return {
         success: false,
         message: 'Failed to update meditation',
-        error: error.message || error,
+        error: (error as Error).message || error,
       };
     }
   }
-  
+
   // @UseGuards(JwtAuthGuard)
   // @Patch('medi/:meditation_id')
   // async updateMediCount(
@@ -147,15 +158,15 @@ export class ContentManagementController {
   //     return {
   //       success: false,
   //       message: 'Failed to update meditation',
-  //       error: error.message || error,
+  //       error: (error as Error).message || error,
   //     };
   //   }
   // }
 
   @UseGuards(JwtAuthGuard)
   @Delete('medi/:id')
-  remove(@Param('id') id: string, @Req() req:any) {
+  remove(@Param('id') id: string, @Req() req: any) {
     const userId = req.user.userId;
-    return this.contentManagementService.remove(userId,id);
+    return this.contentManagementService.remove(userId, id);
   }
 }

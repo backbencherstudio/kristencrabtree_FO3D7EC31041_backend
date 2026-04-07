@@ -15,7 +15,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import appConfig from '../../../config/app.config';
 import { ChatRepository } from '../../../common/repository/chat/chat.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {

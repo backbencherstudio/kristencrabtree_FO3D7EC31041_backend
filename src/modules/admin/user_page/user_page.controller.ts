@@ -12,7 +12,7 @@ import {
 import { UserPageService } from './user_page.service';
 import { CreateUserPageDto } from './dto/create-user_page.dto';
 import { UpdateUserPageDto } from './dto/update-user_page.dto';
-import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('user-page')
